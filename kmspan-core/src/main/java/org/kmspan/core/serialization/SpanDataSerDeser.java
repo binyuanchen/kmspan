@@ -23,10 +23,6 @@ public class SpanDataSerDeser<T> implements Deserializer<SpanData<T>>, Serialize
 
     public SpanDataSerDeser() {
         kryo = new Kryo();
-        kryo.setRegistrationRequired(true);
-
-        // Whatever SpanData needs
-        kryo.register(HashMap.class);
         kryo.register(SpanData.class);
     }
 
