@@ -6,15 +6,13 @@ import org.apache.camel.Exchange;
 import org.apache.camel.Message;
 import org.apache.camel.Processor;
 import org.apache.camel.builder.RouteBuilder;
+import org.apache.camel.component.kafka.KafkaConstants;
 import org.apache.camel.impl.DefaultCamelContext;
 import org.apache.camel.impl.SimpleRegistry;
-import org.apache.kafka.clients.consumer.ConsumerRecord;
-import org.apache.kafka.clients.consumer.ConsumerRecords;
 import org.apache.kafka.clients.producer.ProducerRecord;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.kmspan.core.ConsumerSpanEvent;
-import org.kmspan.core.SpanEventListener;
 import org.kmspan.core.SpanKafkaProducer;
 import org.kmspan.testutils.BaseTestUtil;
 import org.kmspan.testutils.LocalKafkaBroker;
@@ -71,6 +69,7 @@ public class CamelKmspanTest {
         targetConsumerSpy.setZkServer(this.zkServer);
         targetConsumerSpy.setKafkaBroker(this.kafkaBroker);
         targetConsumerSpy.setTestUserSpanEventListener(targetUserSpanEventListenerSpy);
+        targetConsumerSpy.setNumOfPartions(numOfPartions);
         targetConsumerSpy.start();
 
         // producer
@@ -115,6 +114,11 @@ public class CamelKmspanTest {
         private LocalKafkaBroker kafkaBroker;
         private LocalZookeeperServer zkServer;
         private TestUserSpanEventListener testUserSpanEventListener;
+        private int numOfPartions;
+
+        public void setNumOfPartions(int numOfPartions) {
+            this.numOfPartions = numOfPartions;
+        }
 
         public void setTestUserSpanEventListener(TestUserSpanEventListener testUserSpanEventListener) {
             this.testUserSpanEventListener = testUserSpanEventListener;
@@ -134,7 +138,7 @@ public class CamelKmspanTest {
 
         private void work() {
             SimpleRegistry simpleRegistry = new SimpleRegistry();
-            simpleRegistry.put(KmspanConstants.SPAN_EVENT_LISTEN_REGISTRY_NAME, this.testUserSpanEventListener);
+            simpleRegistry.put(KmspanConstants.SPAN_EVENT_LISTENER_REGISTRY_NAME, this.testUserSpanEventListener);
             camelContext = new DefaultCamelContext(simpleRegistry);
 
             try {
@@ -143,30 +147,30 @@ public class CamelKmspanTest {
                             @Override
                             public void configure() throws Exception {
 
-                                String url = "kmspan:" + kafkaBroker.getRunningAddr() + "?topic=" + topic
+                                String kafkaUri = "kafka:" + kafkaBroker.getRunningAddr()
+                                        + "?topic=" + topic
                                         + "&groupId=test&consumersCount=1"
                                         + "&autoOffsetReset=earliest"
-                                        //+ "&keyDeserializer=org.kmspan.core.serialization.SpanDataSerDeser"
                                         + "&keyDeserializer=org.kmspan.camel.TestUserSpanDataStringSerDser"
-                                        + "&valueDeserializer=org.apache.kafka.common.serialization.StringDeserializer"
-                                        + "&spanCoordZkServers=" + zkServer.getRunningAddr();
+                                        + "&valueDeserializer=org.apache.kafka.common.serialization.StringDeserializer";
 
-                                from(url).process(
-                                        /**
-                                         * a user customized processor that handles received user messages
-                                         */
+                                String kmspanUri = "kmspan:default"
+                                        + "?spanZKQuorum=" + zkServer.getRunningAddr()
+                                        + "&spanSCTargetCount=" + numOfPartions;
+
+                                from(kafkaUri)
+                                        .to(kmspanUri)
+                                        .process(
                                         new Processor() {
-
                                             @Override
                                             public void process(Exchange exchange) throws Exception {
                                                 if (exchange.getIn() != null) {
                                                     Message message = exchange.getIn();
-                                                    Long offset = (Long) message.getHeader(KmspanConstants.OFFSET);
-                                                    Integer partitionId = (Integer) message.getHeader(KmspanConstants.PARTITION);
-                                                    String topic = (String) message.getHeader(KmspanConstants.TOPIC);
+                                                    Long offset = (Long) message.getHeader(KafkaConstants.OFFSET);
+                                                    String topic = (String) message.getHeader(KafkaConstants.TOPIC);
                                                     String k = null;
-                                                    if (message.getHeader(KmspanConstants.KEY) != null) {
-                                                        k = (String) message.getHeader(KmspanConstants.KEY);
+                                                    if (message.getHeader(KafkaConstants.KEY) != null) {
+                                                        k = (String) message.getHeader(KafkaConstants.KEY);
                                                     }
                                                     String v = null;
                                                     if (message.getBody() != null) {

@@ -2,22 +2,17 @@ package org.kmspan.camel;
 
 public final class KmspanConstants {
 
-    public static final String PARTITION_KEY = "kafka.PARTITION_KEY";
-    public static final String PARTITION = "kafka.PARTITION";
-    public static final String KEY = "kafka.KEY";
-    public static final String TOPIC = "kafka.TOPIC";
-    public static final String OFFSET = "kafka.OFFSET";
+    // mode or just default (only choice for now)
+    public static final String MODE_OR_DEFAULT = "default";
 
-    public static final String KAFKA_DEFAULT_ENCODER = "kafka.serializer.DefaultEncoder";
-    public static final String KAFKA_STRING_ENCODER = "kafka.serializer.StringEncoder";
-    public static final String KAFKA_DEFAULT_SERIALIZER  = "org.apache.kafka.common.serialization.StringSerializer";
-    public static final String KAFKA_DEFAULT_DESERIALIZER  = "org.apache.kafka.common.serialization.StringDeserializer";
-    public static final String KAFKA_DEFAULT_PARTITIONER = "org.apache.kafka.clients.producer.internals.DefaultPartitioner";
-    public static final String PARTITIONER_RANGE_ASSIGNOR = "org.apache.kafka.clients.consumer.RangeAssignor";
-    public static final String KAFKA_RECORDMETA = "org.apache.kafka.clients.producer.RecordMetadata";
+    // source types
+    public static final String SOURCE_TYPE_KAFKA = "kafka";
 
-    //Span event listener class
-    public static final String SPAN_EVENT_LISTEN_REGISTRY_NAME = "span.event.listener";
+    // storage types
+    public static final String STORAGE_TYPE_ZOOKEEPER = "zookeeper";
+
+    //Span event listener registry key
+    public static final String SPAN_EVENT_LISTENER_REGISTRY_NAME = "span.event.listener";
 
     private KmspanConstants() {
     }

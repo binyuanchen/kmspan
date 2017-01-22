@@ -1,253 +1,141 @@
 package org.kmspan.camel;
 
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.Iterator;
-import java.util.LinkedList;
-import java.util.List;
-import java.util.Properties;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Future;
-import java.util.concurrent.atomic.AtomicInteger;
+import java.util.*;
 
-import org.apache.camel.AsyncCallback;
-import org.apache.camel.CamelException;
-import org.apache.camel.CamelExchangeException;
 import org.apache.camel.Exchange;
-import org.apache.camel.impl.DefaultAsyncProducer;
-import org.apache.kafka.clients.producer.Callback;
-import org.apache.kafka.clients.producer.ProducerConfig;
-import org.apache.kafka.clients.producer.ProducerRecord;
-import org.apache.kafka.clients.producer.RecordMetadata;
+import org.apache.camel.Message;
+import org.apache.camel.component.kafka.KafkaConstants;
+import org.apache.camel.impl.DefaultProducer;
+import org.apache.curator.framework.CuratorFramework;
+import org.apache.curator.framework.CuratorFrameworkFactory;
+import org.apache.curator.retry.ExponentialBackoffRetry;
+import org.apache.kafka.clients.consumer.ConsumerRecord;
+import org.kmspan.core.*;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
-public class KmspanProducer extends DefaultAsyncProducer {
+public class KmspanProducer extends DefaultProducer {
+    private static final Logger logger = LoggerFactory.getLogger(KmspanProducer.class);
 
-    private org.apache.kafka.clients.producer.KafkaProducer kafkaProducer;
     private final KmspanEndpoint endpoint;
-    private ExecutorService workerPool;
-    private boolean shutdownWorkerPool;
+
+    // listeners that registered interests in span events, now there can be only
+    // one listener that comes as a camel registry
+    private SpanEventListener spanEventListener;
+    // handler that can handle span events
+    private SpanEventHandler spanEventHandler;
+    // handler uses this zookeeper client, now it is curator
+    private CuratorFramework curatorFramework;
+    // SC target count, must be the same as topic partition count.
+    private int scTargetCount;
 
     public KmspanProducer(KmspanEndpoint endpoint) {
         super(endpoint);
         this.endpoint = endpoint;
-    }
 
-    Properties getProps() {
-        Properties props = endpoint.getConfiguration().createProducerProperties();
-        endpoint.updateClassProperties(props);
-        if (endpoint.getConfiguration().getBrokers() != null) {
-            props.put(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, endpoint.getConfiguration().getBrokers());
+        if (endpoint.getConfiguration().getModeOrDefault() == null) {
+            throw new IllegalArgumentException("modeOrDefault must be specified");
+            // although we are not using it now
         }
-        return props;
+        if (endpoint.getConfiguration().getSourceType() == null) {
+            throw new IllegalArgumentException("sourceType must be specified");
+            // although we are not using it now
+        }
+        if (endpoint.getConfiguration().getStorageType() == null) {
+            throw new IllegalArgumentException("storageType must be specified");
+            // although we are not using it now
+        }
+
+        if (endpoint.getConfiguration().getSpanZKQuorum() == null) {
+            throw new IllegalArgumentException("spanZKQuorum must be specified");
+        }
+        if (endpoint.getConfiguration().getSpanSCBeginZPath() == null) {
+            throw new IllegalArgumentException("spanSCBeginZPath must be specified");
+        }
+        if (endpoint.getConfiguration().getSpanSCEndZPath() == null) {
+            throw new IllegalArgumentException("spanSCEndZPath must be specified");
+        }
+        if (endpoint.getConfiguration().getSpanSCTargetCount() == null) {
+            throw new IllegalArgumentException("spanSCTargetCount must be specified");
+        } else {
+            this.scTargetCount =
+                    Integer.parseInt(endpoint.getConfiguration().getSpanSCTargetCount());
+            if (this.scTargetCount <= 0) {
+                throw new IllegalArgumentException("scTargetCount must be positive");
+            }
+        }
     }
 
-
-    public org.apache.kafka.clients.producer.KafkaProducer getKafkaProducer() {
-        return kafkaProducer;
-    }
-
-    /**
-     * To use a custom {@link org.apache.kafka.clients.producer.KafkaProducer} instance.
-     */
-    public void setKafkaProducer(org.apache.kafka.clients.producer.KafkaProducer kafkaProducer) {
-        this.kafkaProducer = kafkaProducer;
-    }
-
-    public ExecutorService getWorkerPool() {
-        return workerPool;
-    }
-
-    public void setWorkerPool(ExecutorService workerPool) {
-        this.workerPool = workerPool;
-    }
 
     @Override
     protected void doStart() throws Exception {
-        Properties props = getProps();
-        if (kafkaProducer == null) {
-            ClassLoader threadClassLoader = Thread.currentThread().getContextClassLoader();
-            try {
-                // Kafka uses reflection for loading authentication settings, use its classloader
-                Thread.currentThread().setContextClassLoader(org.apache.kafka.clients.producer.KafkaProducer.class.getClassLoader());
-                kafkaProducer = new org.apache.kafka.clients.producer.KafkaProducer(props);
-            } finally {
-                Thread.currentThread().setContextClassLoader(threadClassLoader);
-            }
+        logger.info("Starting Kmspan producer");
+        // start zk client preparing for coordination of span events
+        this.curatorFramework = CuratorFrameworkFactory.builder()
+                .connectString(endpoint.getConfiguration().getSpanZKQuorum())
+                .retryPolicy(new ExponentialBackoffRetry(1000, 3))
+                .build();
+        this.curatorFramework.start();
+        this.spanEventHandler = new KafkaZKSpanEventHandler(
+                this.curatorFramework,
+                this.scTargetCount,
+                endpoint.getConfiguration().getSpanSCBeginZPath(),
+                endpoint.getConfiguration().getSpanSCEndZPath()
+        );
+        Object selObj = endpoint
+                .getCamelContext()
+                .getRegistry()
+                .lookupByName(KmspanConstants.SPAN_EVENT_LISTENER_REGISTRY_NAME);
+        if (selObj == null) {
+            logger.warn("found no registry for {}", KmspanConstants.SPAN_EVENT_LISTENER_REGISTRY_NAME);
+        } else {
+            this.spanEventListener = (SpanEventListener) selObj;
         }
-
-        // if we are in asynchronous mode we need a worker pool
-        if (!endpoint.isSynchronous() && workerPool == null) {
-            workerPool = endpoint.createProducerExecutor();
-            // we create a thread pool so we should also shut it down
-            shutdownWorkerPool = true;
-        }
+        this.spanEventHandler.registerSpanEventListener(this.spanEventListener);
     }
 
     @Override
     protected void doStop() throws Exception {
-        if (kafkaProducer != null) {
-            kafkaProducer.close();
-        }
-
-        if (shutdownWorkerPool && workerPool != null) {
-            endpoint.getCamelContext().getExecutorServiceManager().shutdown(workerPool);
-            workerPool = null;
-        }
+        logger.info("Stopping Kmspan producer");
+        this.curatorFramework.close();
     }
 
-    @SuppressWarnings("unchecked")
-    protected Iterator<ProducerRecord> createRecorder(Exchange exchange) throws CamelException {
-        String topic = endpoint.getConfiguration().getTopic();
-        if (!endpoint.isBridgeEndpoint()) {
-            topic = exchange.getIn().getHeader(KmspanConstants.TOPIC, topic, String.class);
-        }
-        if (topic == null) {
-            throw new CamelExchangeException("No topic key set", exchange);
-        }
-        final Object partitionKey = exchange.getIn().getHeader(KmspanConstants.PARTITION_KEY);
-        final boolean hasPartitionKey = partitionKey != null;
-
-        final Object messageKey = exchange.getIn().getHeader(KmspanConstants.KEY);
-        final boolean hasMessageKey = messageKey != null;
-
-        Object msg = exchange.getIn().getBody();
-        Iterator<Object> iterator = null;
-        if (msg instanceof Iterable) {
-            iterator = ((Iterable<Object>)msg).iterator();
-        } else if (msg instanceof Iterator) {
-            iterator = (Iterator<Object>)msg;
-        }
-        if (iterator != null) {
-            final Iterator<Object> msgList = iterator;
-            final String msgTopic = topic;
-            return new Iterator<ProducerRecord>() {
-                @Override
-                public boolean hasNext() {
-                    return msgList.hasNext();
-                }
-
-                @Override
-                public ProducerRecord next() {
-                    if (hasPartitionKey && hasMessageKey) {
-                        return new ProducerRecord(msgTopic, new Integer(partitionKey.toString()), messageKey, msgList.next());
-                    } else if (hasMessageKey) {
-                        return new ProducerRecord(msgTopic, messageKey, msgList.next());
-                    }
-                    return new ProducerRecord(msgTopic, msgList.next());
-                }
-
-                @Override
-                public void remove() {
-                    msgList.remove();
-                }
-            };
-        }
-        ProducerRecord record;
-        if (hasPartitionKey && hasMessageKey) {
-            record = new ProducerRecord(topic, new Integer(partitionKey.toString()), messageKey, msg);
-        } else if (hasMessageKey) {
-            record = new ProducerRecord(topic, messageKey, msg);
-        } else {
-            log.warn("No message key or partition key set");
-            record = new ProducerRecord(topic, msg);
-        }
-        return Collections.singletonList(record).iterator();
-    }
-
+    // right now assuming the source is camel-kafka, whose message is (SpanData<K>, V)
     @Override
     @SuppressWarnings("unchecked")
-    // Camel calls this method if the endpoint isSynchronous(), as the KmspanEndpoint creates a SynchronousDelegateProducer for it
     public void process(Exchange exchange) throws Exception {
-        Iterator<ProducerRecord> c = createRecorder(exchange);
-        List<Future<RecordMetadata>> futures = new LinkedList<Future<RecordMetadata>>();
-        List<RecordMetadata> recordMetadatas = new ArrayList<RecordMetadata>();
-
-        if (endpoint.getConfiguration().isRecordMetadata()) {
-            if (exchange.hasOut()) {
-                exchange.getOut().setHeader(KmspanConstants.KAFKA_RECORDMETA, recordMetadatas);
-            } else {
-                exchange.getIn().setHeader(KmspanConstants.KAFKA_RECORDMETA, recordMetadatas);
+        if (exchange.getIn() != null) {
+            Message message = exchange.getIn();
+            Long offset = (Long) message.getHeader(KafkaConstants.OFFSET);
+            Integer partitionId = (Integer) message.getHeader(KafkaConstants.PARTITION);
+            String topic = (String) message.getHeader(KafkaConstants.TOPIC);
+            Object keyObj = message.getHeader(KafkaConstants.KEY);
+            if (keyObj == null) {
+                throw new Exception("No header " + KafkaConstants.KEY + " in exchange");
             }
-        }
-
-        while (c.hasNext()) {
-            futures.add(kafkaProducer.send(c.next()));
-        }
-        for (Future<RecordMetadata> f : futures) {
-            //wait for them all to be sent
-            recordMetadatas.add(f.get());
-        }
-    }
-
-    @Override
-    @SuppressWarnings("unchecked")
-    public boolean process(Exchange exchange, AsyncCallback callback) {
-        try {
-            Iterator<ProducerRecord> c = createRecorder(exchange);
-            KafkaProducerCallBack cb = new KafkaProducerCallBack(exchange, callback);
-            while (c.hasNext()) {
-                cb.increment();
-                kafkaProducer.send(c.next(), cb);
+            if (!(keyObj instanceof SpanData)) {
+                throw new Exception("key object is of wrong type " + keyObj.getClass());
             }
-            return cb.allSent();
-        } catch (Exception ex) {
-            exchange.setException(ex);
-        }
-        callback.done(true);
-        return true;
-    }
+            SpanData spanKey = (SpanData) keyObj;
 
-    private final class KafkaProducerCallBack implements Callback {
-
-        private final Exchange exchange;
-        private final AsyncCallback callback;
-        private final AtomicInteger count = new AtomicInteger(1);
-        private final List<RecordMetadata> recordMetadatas = new ArrayList<>();
-
-        KafkaProducerCallBack(Exchange exchange, AsyncCallback callback) {
-            this.exchange = exchange;
-            this.callback = callback;
-            if (endpoint.getConfiguration().isRecordMetadata()) {
-                if (exchange.hasOut()) {
-                    exchange.getOut().setHeader(KmspanConstants.KAFKA_RECORDMETA, recordMetadatas);
-                } else {
-                    exchange.getIn().setHeader(KmspanConstants.KAFKA_RECORDMETA, recordMetadatas);
+            if (spanKey.getSpanEventType() != null) {
+                if (spanEventHandler != null) {
+                    spanEventHandler.handle(Arrays.asList(
+                            new ConsumerSpanEvent(
+                                    spanKey.getSpanId(),
+                                    spanKey.getSpanEventType(),
+                                    spanKey.getGenerationTimestamp(),
+                                    topic
+                            )
+                    ));
                 }
-            }
-        }
+                // stop propagation of exchange
+                exchange.setProperty(Exchange.ROUTE_STOP, Boolean.TRUE);
+            } else {
+                exchange.getIn().setHeader(KafkaConstants.KEY, spanKey.getData());
 
-        void increment() {
-            count.incrementAndGet();
-        }
-
-        boolean allSent() {
-            if (count.decrementAndGet() == 0) {
-                //was able to get all the work done while queuing the requests
-                callback.done(true);
-                return true;
-            }
-            return false;
-        }
-
-        @Override
-        public void onCompletion(RecordMetadata recordMetadata, Exception e) {
-            if (e != null) {
-                exchange.setException(e);
-            }
-
-            recordMetadatas.add(recordMetadata);
-
-            if (count.decrementAndGet() == 0) {
-                // use worker pool to continue routing the exchange
-                // as this thread is from Kafka Callback and should not be used by Camel routing
-                workerPool.submit(new Runnable() {
-                    @Override
-                    public void run() {
-                        callback.done(false);
-                    }
-                });
+                // TODO what if there is Out?
             }
         }
     }
-
 }

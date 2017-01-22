@@ -19,8 +19,29 @@ public class KafkaZKSpanEventHandler implements SpanEventHandler {
     private KafkaConsumer kafkaConsumer;
     private String spanBeginSCZPath;
     private String spanEndSCZPath;
+    // used preferably to kafkaConsumer if set
+    private int scTargetCount = -1;
 
     private List<SpanEventListener> spanEventListeners = new ArrayList<>();
+
+    public KafkaZKSpanEventHandler(CuratorFramework curatorFramework,
+                                   int scTargetCount,
+                                   String spanBeginSCZPath,
+                                   String spanEndSCZPath) {
+        this(curatorFramework, scTargetCount, spanBeginSCZPath, spanEndSCZPath, new ArrayList<>());
+    }
+
+    public KafkaZKSpanEventHandler(CuratorFramework curatorFramework,
+                                   int scTargetCount,
+                                   String spanBeginSCZPath,
+                                   String spanEndSCZPath,
+                                   List<SpanEventListener> spanEventListeners) {
+        this.curatorFramework = curatorFramework;
+        this.scTargetCount = scTargetCount;
+        this.spanBeginSCZPath = spanBeginSCZPath;
+        this.spanEndSCZPath = spanEndSCZPath;
+        this.spanEventListeners = spanEventListeners;
+    }
 
     public KafkaZKSpanEventHandler(CuratorFramework curatorFramework,
                                    KafkaConsumer kafkaConsumer,
@@ -55,8 +76,14 @@ public class KafkaZKSpanEventHandler implements SpanEventHandler {
             String topic = consumerSpanEvent.getTopic();
             // TODO make 2 cases, async and sync
             if (spanEventType.equals(SpanConstants.SPAN_BEGIN)) {
-                List<PartitionInfo> partitionInfoList = kafkaConsumer.partitionsFor(topic);
-                int targetCount = partitionInfoList.size();
+                int targetCount;
+                if (this.scTargetCount <= 0) {
+                    List<PartitionInfo> partitionInfoList = kafkaConsumer.partitionsFor(topic);
+                    targetCount = partitionInfoList.size();
+                }
+                else {
+                    targetCount = this.scTargetCount;
+                }
                 final String zpath = spanBeginSCZPath + "/" + spanId;
                 SharedCount sharedCount = new SharedCount(curatorFramework, zpath, 0);
                 logger.debug("[{}]created sharedCount, znode={}",
@@ -113,8 +140,14 @@ public class KafkaZKSpanEventHandler implements SpanEventHandler {
                     }
                 }
             } else if (spanEventType.equals(SpanConstants.SPAN_END)) {
-                List<PartitionInfo> partitionInfoList = kafkaConsumer.partitionsFor(topic);
-                int targetCount = partitionInfoList.size();
+                int targetCount;
+                if (this.scTargetCount <= 0) {
+                    List<PartitionInfo> partitionInfoList = kafkaConsumer.partitionsFor(topic);
+                    targetCount = partitionInfoList.size();
+                }
+                else {
+                    targetCount = this.scTargetCount;
+                }
                 final String zpath = spanEndSCZPath + "/" + spanId;
                 SharedCount sharedCount = new SharedCount(curatorFramework, zpath, 0);
                 logger.debug("[{}]created sharedCount, znode={}",
