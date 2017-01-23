@@ -21,7 +21,15 @@ import java.util.regex.Pattern;
  * A {@link Consumer consumer} that delegation all communication with Kafka brokers to an internal
  * {@link KafkaConsumer raw consumer}. The raw consumer polls wire Kafka messages whose key is of
  * type {@code SpanData<K>}, but returns user messages whose key is of type {@code K} to the caller
- * of user code.
+ * of user code. As part of polling raw Kafka messages, span messages are identified and processed,
+ * causing span events being generated. Depending on the interfaces being used, the span events are
+ * generated in two different modes: rough mode and precise mode. For rough mode, please see
+ * {@link org.kmspan.core.annotation.Spaned Spaned} annotation, the aspect
+ * {@link org.kmspan.core.annotation.SpanedAspect aspect} and the {@link #poll(long) poll} method.
+ * For precised mode, please see {@link #pollWithSpan(long) pollWithSpan} method and
+ * {@link SpanIterable iterable}. For more details on both, please see more details on kmspan wiki
+ * <a href="https://github.com/binyuanchen/kmspan/wiki">here</a>.
+ *
  *
  * @param <K> Type of the key of the user messages
  * @param <V> Type of tge value of the user messages
