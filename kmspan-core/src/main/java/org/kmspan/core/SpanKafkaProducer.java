@@ -13,7 +13,19 @@ import java.util.Properties;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 
-public class SpanKafkaProducer<K, V> implements Producer<K, V>, SpanEventTrigger {
+/**
+ * A {@link Producer producer} that delegates all communication with Kafka brokers to an
+ * internal {@link KafkaProducer KafkaProducer}, by converting user messages to a wire format
+ * that carries span related information, also with extra APIs to generated span BEGIN and
+ * END messages.
+ * <p>
+ * A span begin or end message is multi-casted to each topic partition of a Kafka topic via
+ * {@link #beginSpan(String, String) beginSpan} and {@link #endSpan(String, String) endSpan}
+ * methods. See
+ * {@link SpanKafkaConsumer SpanKafkaConsumer} and {@link SpanEventHandler SpanEventHandler}
+ * for how these span messages are collected on consumer side to generate span events.
+ */
+public class SpanKafkaProducer<K, V> implements Producer<K, V>, SpanMessageTrigger {
     private KafkaProducer<SpanData<K>, V> delegate;
 
     public SpanKafkaProducer(Map<String, Object> configs, SpanDataSerDeser<K> ser) {

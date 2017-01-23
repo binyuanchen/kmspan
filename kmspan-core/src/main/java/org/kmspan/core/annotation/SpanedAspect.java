@@ -25,18 +25,6 @@ public class SpanedAspect {
     public void execing() {
     }
 
-    /**
-     * TODO
-     * clearly there is a hole below, although it may not be a big deal for a span that has many
-     * regular messages in between (thousands). Improve this if possible.
-     *
-     * Next step: at lease guarantee the relative ordering of span events among span. (using timestamp
-     * of events or its kafka offset for ordering?)
-     *
-     * Next next step: can we further guarantee the relative ordering among span events and regular messages?
-     * (a new poll api with iterator returned?)
-     */
-
     @Before("execing() && sep()")
     public void preProcessSpaned() {
         SpanEventHandler handler = SpanEventTLHolder.getSpanEventHandler();

@@ -17,6 +17,15 @@ import org.kmspan.core.serialization.SpanDataSerDeser;
 import java.util.*;
 import java.util.regex.Pattern;
 
+/**
+ * A {@link Consumer consumer} that delegation all communication with Kafka brokers to an internal
+ * {@link KafkaConsumer raw consumer}. The raw consumer polls wire Kafka messages whose key is of
+ * type {@code SpanData<K>}, but returns user messages whose key is of type {@code K} to the caller
+ * of user code.
+ *
+ * @param <K> Type of the key of the user messages
+ * @param <V> Type of tge value of the user messages
+ */
 public class SpanKafkaConsumer<K, V> implements Consumer<K, V> {
     private static Logger logger = LogManager.getLogger(SpanKafkaConsumer.class);
 

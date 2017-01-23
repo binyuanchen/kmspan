@@ -12,6 +12,9 @@ import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
 
+/**
+ * The actual messages on the wire (say Kafka) contains
+ */
 public class SpanDataSerDeser<T> implements Deserializer<SpanData<T>>, Serializer<SpanData<T>> {
 
     // TODO make it thread safe

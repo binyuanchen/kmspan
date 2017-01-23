@@ -12,10 +12,15 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 
+/**
+ * An implementation of {@link SpanEventHandler SpanEventHandler} wherein handlers collaborate using Zookeeper.
+ */
 public class KafkaZKSpanEventHandler implements SpanEventHandler {
     private static Logger logger = LogManager.getLogger(KafkaZKSpanEventHandler.class);
 
     private CuratorFramework curatorFramework;
+    // TODO remove this and uses scTargetCount instead, this class should only depends on
+    // Zookeeper, not Kafka
     private KafkaConsumer kafkaConsumer;
     private String spanBeginSCZPath;
     private String spanEndSCZPath;
@@ -80,8 +85,7 @@ public class KafkaZKSpanEventHandler implements SpanEventHandler {
                 if (this.scTargetCount <= 0) {
                     List<PartitionInfo> partitionInfoList = kafkaConsumer.partitionsFor(topic);
                     targetCount = partitionInfoList.size();
-                }
-                else {
+                } else {
                     targetCount = this.scTargetCount;
                 }
                 final String zpath = spanBeginSCZPath + "/" + spanId;
@@ -144,8 +148,7 @@ public class KafkaZKSpanEventHandler implements SpanEventHandler {
                 if (this.scTargetCount <= 0) {
                     List<PartitionInfo> partitionInfoList = kafkaConsumer.partitionsFor(topic);
                     targetCount = partitionInfoList.size();
-                }
-                else {
+                } else {
                     targetCount = this.scTargetCount;
                 }
                 final String zpath = spanEndSCZPath + "/" + spanId;

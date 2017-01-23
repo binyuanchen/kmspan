@@ -1,6 +1,9 @@
 package org.kmspan.core;
 
-public interface SpanEventTrigger {
+/**
+ * This interface is supposed to be implemented at producer side to generate span messages.
+ */
+public interface SpanMessageTrigger {
     /**
      * signals that a span begins
      */
