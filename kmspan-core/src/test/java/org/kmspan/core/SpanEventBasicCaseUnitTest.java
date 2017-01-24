@@ -14,8 +14,8 @@ import org.testng.annotations.Test;
 
 import static org.mockito.Mockito.*;
 
-public class RoughEventModeUnitTest {
-    private static Logger logger = LogManager.getLogger(RoughEventModeUnitTest.class);
+public class SpanEventBasicCaseUnitTest {
+    private static Logger logger = LogManager.getLogger(SpanEventBasicCaseUnitTest.class);
 
     // a 'local' Zookeeper server that runs in the same jvm as this test
     private LocalZookeeperServer zkServer = new LocalZookeeperServer();
