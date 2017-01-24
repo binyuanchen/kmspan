@@ -14,8 +14,8 @@ import org.testng.annotations.Test;
 
 import static org.mockito.Mockito.*;
 
-public class SpanEventBasicCaseUnitTest {
-    private static Logger logger = LogManager.getLogger(SpanEventBasicCaseUnitTest.class);
+public class SpanEventBasicUnitTest {
+    private static Logger logger = LogManager.getLogger(SpanEventBasicUnitTest.class);
 
     // a 'local' Zookeeper server that runs in the same jvm as this test
     private LocalZookeeperServer zkServer = new LocalZookeeperServer();
@@ -65,7 +65,8 @@ public class SpanEventBasicCaseUnitTest {
         // create a span event listener, and spy on it
         SampleSpanEventListener listenerSpy = spy(SampleSpanEventListener.class);
 
-        // create a consumer that can process span events in rough mode, and spy on it
+        // create a consumer that polls messages and consume them in a way so that span events
+        // are processed in 'rough mode', and spy on it
         SampleRoughEventModeConsumerApp consumerApp = new SampleRoughEventModeConsumerApp(
                 zkServer.getRunningAddr(),
                 kafkaBroker.getRunningAddr(),
@@ -74,7 +75,7 @@ public class SpanEventBasicCaseUnitTest {
                 listenerSpy);
         SampleRoughEventModeConsumerApp consumerAppSpy = spy(consumerApp);
 
-        // create a prodcuer to send span messages and user messages
+        // create a producer to send span messages and user messages
         SampleSpanProducerApp producerApp = new SampleSpanProducerApp(kafkaBroker.getRunningAddr());
 
         // start the consumer polling loop, which runs in a separate thread
@@ -95,6 +96,7 @@ public class SpanEventBasicCaseUnitTest {
 
         verify(consumerAppSpy, times(num1 + num2))
                 .onUserMessage(anyString(), anyString(), anyInt(), anyString());
+        // there are 4 span events, one BEGIN and one END for each of these 2 spans
         verify(listenerSpy, times(4)).onSpanEvent(any(ConsumerSpanEvent.class));
     }
 
@@ -117,7 +119,8 @@ public class SpanEventBasicCaseUnitTest {
         // create a span event listener, and spy on it
         SampleSpanEventListener listenerSpy = spy(SampleSpanEventListener.class);
 
-        // create a consumer that can process span events in precise mode, and spy on it
+        // create a consumer that polls messages and consume them in a way so that span events are
+        // processed in 'precise mode', and spy on it
         SamplePreciseEventModeConsumerApp consumerApp = new SamplePreciseEventModeConsumerApp(
                 zkServer.getRunningAddr(),
                 kafkaBroker.getRunningAddr(),
@@ -126,13 +129,13 @@ public class SpanEventBasicCaseUnitTest {
                 listenerSpy);
         SamplePreciseEventModeConsumerApp consumerAppSpy = spy(consumerApp);
 
-        // create a prodcuer to send span messages and user messages
+        // create a producer to send span messages and user messages
         SampleSpanProducerApp producerApp = new SampleSpanProducerApp(kafkaBroker.getRunningAddr());
 
         // start the consumer polling loop, which runs in a separate thread
         consumerAppSpy.startConsumerLoop();
 
-        // use the producer to send 2 spans of messages, each with 10 user messages
+        // use the producer to send one spans of messages, with 10 user messages
         producerApp.beginSpanAndUserMessagesAndEndSpan(spanId1, topicName, num1);
         producerApp.flush();
         producerApp.close();
@@ -146,6 +149,7 @@ public class SpanEventBasicCaseUnitTest {
 
         verify(consumerAppSpy, times(num1))
                 .onUserMessage(anyString(), anyString(), anyInt(), anyString());
+        // there are two span events, one BEGIN and one END for this span
         verify(listenerSpy, times(2)).onSpanEvent(any(ConsumerSpanEvent.class));
     }
 }
