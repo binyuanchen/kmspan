@@ -62,13 +62,13 @@ public class CamelKmspanTest {
 
         BaseTestUtil.createTopic(this.zkServer.getRunningAddr(), topicName, numOfPartions, 1);
 
-        TestUserSpanEventListener targetUserSpanEventListenerSpy = spy(TestUserSpanEventListener.class);
+        DummyUserSpanEventListener targetUserSpanEventListenerSpy = spy(DummyUserSpanEventListener.class);
 
         CamelKafkaConsumerAndListener targetConsumerSpy = spy(CamelKafkaConsumerAndListener.class);
         targetConsumerSpy.setTopic(topicName);
         targetConsumerSpy.setZkServer(this.zkServer);
         targetConsumerSpy.setKafkaBroker(this.kafkaBroker);
-        targetConsumerSpy.setTestUserSpanEventListener(targetUserSpanEventListenerSpy);
+        targetConsumerSpy.setDummyUserSpanEventListener(targetUserSpanEventListenerSpy);
         targetConsumerSpy.setNumOfPartions(numOfPartions);
         targetConsumerSpy.start();
 
@@ -113,15 +113,15 @@ public class CamelKmspanTest {
         private CamelContext camelContext;
         private LocalKafkaBroker kafkaBroker;
         private LocalZookeeperServer zkServer;
-        private TestUserSpanEventListener testUserSpanEventListener;
+        private DummyUserSpanEventListener dummyUserSpanEventListener;
         private int numOfPartions;
 
         public void setNumOfPartions(int numOfPartions) {
             this.numOfPartions = numOfPartions;
         }
 
-        public void setTestUserSpanEventListener(TestUserSpanEventListener testUserSpanEventListener) {
-            this.testUserSpanEventListener = testUserSpanEventListener;
+        public void setDummyUserSpanEventListener(DummyUserSpanEventListener dummyUserSpanEventListener) {
+            this.dummyUserSpanEventListener = dummyUserSpanEventListener;
         }
 
         public void setKafkaBroker(LocalKafkaBroker kafkaBroker) {
@@ -138,7 +138,7 @@ public class CamelKmspanTest {
 
         private void work() {
             SimpleRegistry simpleRegistry = new SimpleRegistry();
-            simpleRegistry.put(KmspanConstants.SPAN_EVENT_LISTENER_REGISTRY_NAME, this.testUserSpanEventListener);
+            simpleRegistry.put(KmspanConstants.SPAN_EVENT_LISTENER_REGISTRY_NAME, this.dummyUserSpanEventListener);
             camelContext = new DefaultCamelContext(simpleRegistry);
 
             try {
@@ -151,7 +151,7 @@ public class CamelKmspanTest {
                                         + "?topic=" + topic
                                         + "&groupId=test&consumersCount=1"
                                         + "&autoOffsetReset=earliest"
-                                        + "&keyDeserializer=org.kmspan.camel.TestUserSpanDataStringSerDser"
+                                        + "&keyDeserializer=org.kmspan.camel.DummyUserSpanDataStringSerDser"
                                         + "&valueDeserializer=org.apache.kafka.common.serialization.StringDeserializer";
 
                                 String kmspanUri = "kmspan:default"

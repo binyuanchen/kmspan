@@ -19,17 +19,16 @@ import java.util.regex.Pattern;
 
 /**
  * A {@link Consumer consumer} that delegation all communication with Kafka brokers to an internal
- * {@link KafkaConsumer raw consumer}. The raw consumer polls wire Kafka messages whose key is of
- * type {@code SpanData<K>}, but returns user messages whose key is of type {@code K} to the caller
- * of user code. As part of polling raw Kafka messages, span messages are identified and processed,
- * causing span events being generated. Depending on the interfaces being used, the span events are
- * generated in two different modes: rough mode and precise mode. For rough mode, please see
+ * {@link KafkaConsumer raw consumer}. The raw consumer polls wire Kafka messages whose key are of
+ * type {@code SpanData<K>}, but returns user messages whose key are of type {@code K} to the caller
+ * user code. As part of polling raw Kafka messages, span messages are identified and processed,
+ * causing span events being generated. Depending on which interface is used, the span messages are
+ * processed in two different modes: rough mode and precise mode. For rough mode, please see
  * {@link org.kmspan.core.annotation.Spaned Spaned} annotation, the aspect
  * {@link org.kmspan.core.annotation.SpanedAspect aspect} and the {@link #poll(long) poll} method.
  * For precised mode, please see {@link #pollWithSpan(long) pollWithSpan} method and
  * {@link SpanIterable iterable}. For more details on both, please see more details on kmspan wiki
- * <a href="https://github.com/binyuanchen/kmspan/wiki">here</a>.
- *
+ * <a href="https://github.com/binyuanchen/kmspan/wiki">kmspan wiki</a>.
  *
  * @param <K> Type of the key of the user messages
  * @param <V> Type of tge value of the user messages
@@ -42,6 +41,7 @@ public class SpanKafkaConsumer<K, V> implements Consumer<K, V> {
     private CuratorFramework curatorFramework;
     private String spanBeginSCZPath;
     private String spanEndSCZPath;
+    private SpanProcessingStrategy.Mode processingMode = SpanProcessingStrategy.Mode.ROUGH;
 
     private KafkaZKSpanEventHandler kafkaZKSpanEventHandler;
 
@@ -86,6 +86,19 @@ public class SpanKafkaConsumer<K, V> implements Consumer<K, V> {
                 rawKafkaConsumer,
                 spanBeginSCZPath,
                 spanEndSCZPath);
+        String pmodeStr = (String) configs.get(SpanConstants.SPAN_PROCESSING_MODE);
+        if (pmodeStr != null) {
+            SpanProcessingStrategy.Mode pmode = SpanProcessingStrategy.Mode.getByName(pmodeStr);
+            if (pmode == null) {
+                throw new IllegalArgumentException("illegal value "
+                        + pmodeStr + " is specified for config "
+                        + SpanConstants.SPAN_PROCESSING_MODE);
+            } else {
+                processingMode = pmode;
+            }
+        } else {
+            processingMode = SpanProcessingStrategy.Mode.ROUGH;
+        }
     }
 
     public SpanKafkaConsumer(Properties properties, SpanDataSerDeser<K> deser) {
@@ -128,6 +141,23 @@ public class SpanKafkaConsumer<K, V> implements Consumer<K, V> {
                 rawKafkaConsumer,
                 spanBeginSCZPath,
                 spanEndSCZPath);
+        String pmodeStr = (String) properties.get(SpanConstants.SPAN_PROCESSING_MODE);
+        if (pmodeStr != null) {
+            SpanProcessingStrategy.Mode pmode = SpanProcessingStrategy.Mode.getByName(pmodeStr);
+            if (pmode == null) {
+                throw new IllegalArgumentException("illegal value "
+                        + pmodeStr + " is specified for config "
+                        + SpanConstants.SPAN_PROCESSING_MODE);
+            } else {
+                processingMode = pmode;
+            }
+        } else {
+            processingMode = SpanProcessingStrategy.Mode.ROUGH;
+        }
+    }
+
+    public void setProcessingMode(SpanProcessingStrategy.Mode processingMode) {
+        this.processingMode = processingMode;
     }
 
     public void registerSpanEventListener(SpanEventListener listener) {
@@ -171,6 +201,12 @@ public class SpanKafkaConsumer<K, V> implements Consumer<K, V> {
 
     @Override
     public ConsumerRecords<K, V> poll(long timeout) {
+        // if you try to get span messages processed in precise mode, you should not
+        // use this api
+        if (processingMode.equals(SpanProcessingStrategy.Mode.PRECISE)) {
+            throw new IllegalStateException("poll is not supported in span processing mode "
+                    + processingMode.getName());
+        }
         /**
          * assuming the same caller thread is gonna do the real work synchronously
          * TODO switch mode (if enabled, use annotation, else, process span event right here)
@@ -230,6 +266,10 @@ public class SpanKafkaConsumer<K, V> implements Consumer<K, V> {
     }
 
     public Iterator<ConsumerRecord<K, V>> pollWithSpan(long timeout) {
+        if (processingMode.equals(SpanProcessingStrategy.Mode.ROUGH)) {
+            throw new IllegalStateException("pollWithSpan is not supported in span processing mode "
+                    + processingMode.getName());
+        }
         ConsumerRecords<SpanData<K>, V> wireRecords = rawKafkaConsumer.poll(timeout);
         return new SpanIterable<>(kafkaZKSpanEventHandler, wireRecords).iterator();
     }
@@ -340,13 +380,16 @@ public class SpanKafkaConsumer<K, V> implements Consumer<K, V> {
         rawKafkaConsumer.wakeup();
     }
 
-    //TODO create an iterator that can process span event data while walking
-    private static class SpanIterable<K, V> implements Iterable<ConsumerRecord<K, V>> {
+    private class SpanIterable<K, V> implements Iterable<ConsumerRecord<K, V>> {
         private final SortedSet<ConsumerRecord<SpanData<K>, V>> sortedSet;
         private final SpanEventHandler spanEventHandler;
 
         public SpanIterable(SpanEventHandler spanEventHandler,
                             ConsumerRecords<SpanData<K>, V> consumerRecords) {
+            if (processingMode.equals(SpanProcessingStrategy.Mode.ROUGH)) {
+                throw new IllegalStateException("SpanIterable is not supported in span processing mode "
+                        + processingMode.getName());
+            }
             this.spanEventHandler = spanEventHandler;
             // comparator
             this.sortedSet = new TreeSet<ConsumerRecord<SpanData<K>, V>>(

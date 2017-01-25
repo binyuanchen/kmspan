@@ -8,8 +8,8 @@ import org.kmspan.core.SpanEventListener;
 /**
  * how user handle received span event, here user just logs.
  */
-public class TestUserSpanEventListener implements SpanEventListener {
-    private static Logger logger = LogManager.getLogger(TestUserSpanEventListener.class);
+public class DummyUserSpanEventListener implements SpanEventListener {
+    private static Logger logger = LogManager.getLogger(DummyUserSpanEventListener.class);
 
     @Override
     public void onSpanEvent(ConsumerSpanEvent consumerSpanEvent) {

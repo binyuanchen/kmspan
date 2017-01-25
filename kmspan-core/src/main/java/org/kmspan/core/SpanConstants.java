@@ -47,4 +47,11 @@ public class SpanConstants {
      * {@code "server1:2181,server2:2181,server3:2181"}
      */
     public final static String DEFAULT_SPAN_ZK_QUORUM = "localhost:2181";
+
+    /**
+     * refer to {@link org.kmspan.core.SpanProcessingStrategy.Mode mode} for this
+     */
+    public final static String SPAN_PROCESSING_MODE = "span.processing.mode";
+
+    public final static String DEFAULT_SPAN_PROCESSING_MODE = "rough";
 }

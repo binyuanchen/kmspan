@@ -8,6 +8,7 @@ import org.apache.logging.log4j.Logger;
 import org.kmspan.core.SpanConstants;
 import org.kmspan.core.SpanEventListener;
 import org.kmspan.core.SpanKafkaConsumer;
+import org.kmspan.core.SpanProcessingStrategy;
 import org.kmspan.core.annotation.Spaned;
 
 import java.util.ArrayList;
@@ -88,6 +89,8 @@ public class SamplePreciseEventModeConsumerApp {
                 props.put(SpanConstants.SPAN_BEGIN_SC_ZPATH, SpanConstants.DEFAULT_SPAN_BEGIN_SC_ZPATH);
                 // the shared counter path for the span END, this is a path prefix
                 props.put(SpanConstants.SPAN_END_SC_ZPATH, SpanConstants.DEFAULT_SPAN_END_SC_ZPATH);
+                // set the span messages processing mode to PRECISE
+                props.put(SpanConstants.SPAN_PROCESSING_MODE, "precise");
 
                 // create a spanKafkaConsumer
                 spanKafkaConsumer = new SpanKafkaConsumer<>(props, null);
