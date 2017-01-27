@@ -1,3 +1,6 @@
+-# kmspan
+ 
+-Welcome to kmspan!
 
 Kafka topic partitions greatly help in parallelizing messages/events transferring, and it becomes widely adopted in applications where realtime or near-realtime processing on messages/events is desired. It is not meant to server all messaging use cases, of course. Recently I was looking at these cases below,
 *  1. a stream of messages can be partitioned to a number of sub-streams of messages, different sub-streams can be processed on consumers independently, 
