@@ -62,4 +62,8 @@ public class SpanData<T> {
                 ", data=" + data +
                 '}';
     }
+
+    public boolean isSpanMessage() {
+        return getSpanEventType() != null;
+    }
 }

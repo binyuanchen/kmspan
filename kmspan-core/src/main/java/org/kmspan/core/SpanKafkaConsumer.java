@@ -270,8 +270,18 @@ public class SpanKafkaConsumer<K, V> implements Consumer<K, V> {
             throw new IllegalStateException("pollWithSpan is not supported in span processing mode "
                     + processingMode.getName());
         }
+
         ConsumerRecords<SpanData<K>, V> wireRecords = rawKafkaConsumer.poll(timeout);
-        return new SpanIterable<>(kafkaZKSpanEventHandler, wireRecords).iterator();
+
+        return hasAnySpanMessages(wireRecords) ?
+                new SpanIterable<>(kafkaZKSpanEventHandler, wireRecords).iterator() :
+                new UserOnlyIterable(wireRecords.iterator()).iterator();
+    }
+
+    // decides whether a poll of records contains any span messages
+    private boolean hasAnySpanMessages(ConsumerRecords<SpanData<K>, V> records) {
+        return records.partitions().parallelStream().flatMap(tp -> records.records(tp).parallelStream())
+                .anyMatch(cr -> cr.key().getSpanEventType() != null);
     }
 
     @Override
@@ -371,8 +381,11 @@ public class SpanKafkaConsumer<K, V> implements Consumer<K, V> {
 
     @Override
     public void close() {
-        rawKafkaConsumer.close();
-        curatorFramework.close();
+        try {
+            rawKafkaConsumer.close();
+        } finally {
+            curatorFramework.close();
+        }
     }
 
     @Override
@@ -380,62 +393,79 @@ public class SpanKafkaConsumer<K, V> implements Consumer<K, V> {
         rawKafkaConsumer.wakeup();
     }
 
+    private class UserOnlyIterable<K, V> implements Iterable<ConsumerRecord<K, V>> {
+        private final Iterator<ConsumerRecord<SpanData<K>, V>> it;
+
+        // assumes input iterator contains only user messages
+        public UserOnlyIterable(Iterator<ConsumerRecord<SpanData<K>, V>> it) {
+            this.it = it;
+        }
+
+        @Override
+        public Iterator<ConsumerRecord<K, V>> iterator() {
+            return new AbstractIterator<ConsumerRecord<K, V>>() {
+                @Override
+                protected ConsumerRecord<K, V> makeNext() {
+                    while (it.hasNext()) {
+                        SpanMessageUtils.toUserMessage(it.next());
+                    }
+                    return allDone();
+                }
+            };
+        }
+    }
+
     private class SpanIterable<K, V> implements Iterable<ConsumerRecord<K, V>> {
         private final SortedSet<ConsumerRecord<SpanData<K>, V>> sortedSet;
         private final SpanEventHandler spanEventHandler;
 
-        public SpanIterable(SpanEventHandler spanEventHandler,
-                            ConsumerRecords<SpanData<K>, V> consumerRecords) {
+        public SpanIterable(SpanEventHandler spanEventHandler, ConsumerRecords<SpanData<K>, V> consumerRecords) {
             if (processingMode.equals(SpanProcessingStrategy.Mode.ROUGH)) {
                 throw new IllegalStateException("SpanIterable is not supported in span processing mode "
                         + processingMode.getName());
             }
             this.spanEventHandler = spanEventHandler;
+
             // comparator
-            this.sortedSet = new TreeSet<ConsumerRecord<SpanData<K>, V>>(
-                    new Comparator<ConsumerRecord<SpanData<K>, V>>() {
-                        @Override
-                        public int compare(ConsumerRecord<SpanData<K>, V> o1,
-                                           ConsumerRecord<SpanData<K>, V> o2) {
-                            SpanData<K> sad1 = o1.key();
-                            SpanData<K> sad2 = o2.key();
-                            if (sad1 != null && sad2 != null) {
-                                if (sad1.getGenerationTimestamp() < sad2.getGenerationTimestamp()) {
+            this.sortedSet = new TreeSet<>((ConsumerRecord<SpanData<K>, V> o1, ConsumerRecord<SpanData<K>, V> o2) -> {
+                SpanData<K> sad1 = o1.key();
+                SpanData<K> sad2 = o2.key();
+                if (sad1 != null && sad2 != null) {
+                    if (sad1.getGenerationTimestamp() < sad2.getGenerationTimestamp()) {
+                        return -1;
+                    } else if (sad1.getGenerationTimestamp() > sad2.getGenerationTimestamp()) {
+                        return 1;
+                    } else {
+                        TopicPartition tp1 = new TopicPartition(o1.topic(), o1.partition());
+                        TopicPartition tp2 = new TopicPartition(o2.topic(), o2.partition());
+                        if (tp1.equals(tp2)) {
+                            if (o1.offset() < o2.offset()) {
+                                return -1;
+                            } else {
+                                return 1;
+                            }
+                        } else {
+                            // not from same TP, and with same event generation timestamp
+                            // always put span begin event in front of span end event for the same span
+                            if (sad1.getSpanId() != null
+                                    && !sad1.getSpanId().equals(sad2.getSpanId())
+                                    && sad1.getSpanEventType() != null
+                                    && sad2.getSpanEventType() != null
+                                    && !sad1.getSpanEventType().equals(sad2.getSpanEventType())) {
+                                if (sad1.getSpanEventType().equals(SpanConstants.SPAN_BEGIN)) {
                                     return -1;
-                                } else if (sad1.getGenerationTimestamp() > sad2.getGenerationTimestamp()) {
-                                    return 1;
                                 } else {
-                                    TopicPartition tp1 = new TopicPartition(o1.topic(), o1.partition());
-                                    TopicPartition tp2 = new TopicPartition(o2.topic(), o2.partition());
-                                    if (tp1.equals(tp1)) {
-                                        if (o1.offset() < o2.offset()) {
-                                            return -1;
-                                        } else {
-                                            return 1;
-                                        }
-                                    } else {
-                                        // not from same TP, and with same event generation timestamp
-                                        // always put span begin event in front of span end event for the same span
-                                        if (sad1.getSpanId() != null
-                                                && !sad1.getSpanId().equals(sad2.getSpanId())
-                                                && sad1.getSpanEventType() != null
-                                                && sad2.getSpanEventType() != null
-                                                && !sad1.getSpanEventType().equals(sad2.getSpanEventType())) {
-                                            if (sad1.getSpanEventType().equals(SpanConstants.SPAN_BEGIN)) {
-                                                return -1;
-                                            } else {
-                                                return 1;
-                                            }
-                                        } else {
-                                            return 1;
-                                        }
-                                    }
+                                    return 1;
                                 }
                             } else {
-                                throw new IllegalArgumentException("missing message key: o1=" + o1 + ", o2=" + o2);
+                                return 1;
                             }
                         }
-                    });
+                    }
+                } else {
+                    throw new IllegalArgumentException("missing message key: o1=" + o1 + ", o2=" + o2);
+                }
+            });
             for (ConsumerRecord<SpanData<K>, V> consumerRecord : consumerRecords) {
                 this.sortedSet.add(consumerRecord);
             }
@@ -450,23 +480,12 @@ public class SpanKafkaConsumer<K, V> implements Consumer<K, V> {
                 protected ConsumerRecord<K, V> makeNext() {
                     while (iter.hasNext()) {
                         ConsumerRecord<SpanData<K>, V> record = iter.next();
-                        if (record.key().getSpanEventType() != null) {
+                        if (record.key().isSpanMessage()) {
                             // span event, process it inline (and in order)
-                            spanEventHandler.handle(Arrays.asList(
-                                    new ConsumerSpanEvent(
-                                            record.key().getSpanId(),
-                                            record.key().getSpanEventType(),
-                                            record.key().getGenerationTimestamp(),
-                                            record.topic())
-                            ));
+                            spanEventHandler.handle(Arrays.asList(SpanMessageUtils.toSpanMessage(record)));
                         } else {
                             // user message, transform
-                            return new ConsumerRecord<K, V>(
-                                    record.topic(),
-                                    record.partition(),
-                                    record.offset(),
-                                    record.key().getData(),
-                                    record.value());
+                            return SpanMessageUtils.toUserMessage(record);
                         }
                     }
                     return allDone();
