@@ -8,6 +8,7 @@ import org.apache.kafka.common.Metric;
 import org.apache.kafka.common.MetricName;
 import org.apache.kafka.common.PartitionInfo;
 import org.apache.kafka.common.TopicPartition;
+import org.apache.kafka.common.record.TimestampType;
 import org.apache.kafka.common.serialization.Deserializer;
 import org.apache.kafka.common.utils.AbstractIterator;
 import org.apache.logging.log4j.LogManager;
@@ -16,6 +17,8 @@ import org.kmspan.core.serialization.SpanDataSerDeser;
 
 import java.util.*;
 import java.util.regex.Pattern;
+import java.util.stream.Collector;
+import java.util.stream.Collectors;
 
 /**
  * A {@link Consumer consumer} that delegation all communication with Kafka brokers to an internal
@@ -27,7 +30,7 @@ import java.util.regex.Pattern;
  * {@link org.kmspan.core.annotation.Spaned Spaned} annotation, the aspect
  * {@link org.kmspan.core.annotation.SpanedAspect aspect} and the {@link #poll(long) poll} method.
  * For precised mode, please see {@link #pollWithSpan(long) pollWithSpan} method and
- * {@link SpanIterable iterable}. For more details on both, please see more details on kmspan wiki
+ * {@link OrderedMixedIterable iterable}. For more details on both, please see more details on kmspan wiki
  * <a href="https://github.com/binyuanchen/kmspan/wiki">kmspan wiki</a>.
  *
  * @param <K> Type of the key of the user messages
@@ -221,47 +224,26 @@ public class SpanKafkaConsumer<K, V> implements Consumer<K, V> {
 
         ConsumerRecords<SpanData<K>, V> wireRecords = rawKafkaConsumer.poll(timeout);
 
-        // internal structure to collect only span events and sort them based on generation timestamp
-        TreeSet<ConsumerSpanEvent> sortedConsumerSpanEvents = new TreeSet<ConsumerSpanEvent>(new Comparator<ConsumerSpanEvent>() {
-            @Override
-            public int compare(ConsumerSpanEvent o1, ConsumerSpanEvent o2) {
-                if (o1.getGenerationTime() < o2.getGenerationTime()) {
-                    return -1;
-                } else {
-                    return 1;
-                }
-            }
-        });
+        // span messages with some ordering
+        TreeSet<ConsumerSpanEvent> newSpanMessages = new TreeSet<>(new SpanMessageComparator());
 
-        // records to be return to user functions
+        // user messages
         Map<TopicPartition, List<ConsumerRecord<K, V>>> newUserRecords = new HashMap<>();
+
+        // collect
         for (TopicPartition partition : wireRecords.partitions()) {
             newUserRecords.put(partition, new ArrayList<>());
-            List<ConsumerRecord<SpanData<K>, V>> partitionRecords = wireRecords.records(partition);
-            for (ConsumerRecord<SpanData<K>, V> partitionRecord : partitionRecords) {
-                SpanData<K> spanKey = partitionRecord.key();
-                if (spanKey.getSpanEventType() != null) {
+            wireRecords.records(partition).stream().forEach(r -> {
+                if (r.key().isSpanMessage()) {
                     // TODO switch mode (if enabled, use annotation, else, process span event right here)
-                    sortedConsumerSpanEvents.add(new ConsumerSpanEvent(
-                            spanKey.getSpanId(),
-                            spanKey.getSpanEventType(),
-                            spanKey.getGenerationTimestamp(),
-                            partitionRecord.topic()));
+                    newSpanMessages.add(SpanMessageUtils.toSpanMessage(r));
                 } else {
-                    newUserRecords.get(partition).add(
-                            new ConsumerRecord<K, V>(
-                                    partitionRecord.topic(),
-                                    partitionRecord.partition(),
-                                    partitionRecord.offset(),
-                                    spanKey.getData(),
-                                    partitionRecord.value()
-                            )
-                    );
+                    newUserRecords.get(partition).add(SpanMessageUtils.toUserMessage(r));
                 }
-            }
+            });
         }
-        // adding all events to list maintaining their order
-        SpanEventTLHolder.getSpanEvents().addAll(sortedConsumerSpanEvents);
+
+        SpanEventTLHolder.getSpanEvents().addAll(newSpanMessages);
         return new ConsumerRecords<>(newUserRecords);
     }
 
@@ -274,7 +256,7 @@ public class SpanKafkaConsumer<K, V> implements Consumer<K, V> {
         ConsumerRecords<SpanData<K>, V> wireRecords = rawKafkaConsumer.poll(timeout);
 
         return hasAnySpanMessages(wireRecords) ?
-                new SpanIterable<>(kafkaZKSpanEventHandler, wireRecords).iterator() :
+                new OrderedMixedIterable<>(kafkaZKSpanEventHandler, wireRecords).iterator() :
                 new UserOnlyIterable(wireRecords.iterator()).iterator();
     }
 
@@ -393,6 +375,63 @@ public class SpanKafkaConsumer<K, V> implements Consumer<K, V> {
         rawKafkaConsumer.wakeup();
     }
 
+    // strictly speaking, the ordering here is very special:
+    // -1 no user messages are involved
+    // -2 all BEGIN messages are sorted
+    // -3 all END messages are sorted
+    // -4 no ordering between BEING messages and END messages
+    // this is only used to collect span messages and prepare for Spaned annotation processing.
+    private static class SpanMessageComparator implements Comparator<ConsumerSpanEvent> {
+        // overall, should no return 0, as that will cause lose of events
+        @Override
+        public int compare(ConsumerSpanEvent o1, ConsumerSpanEvent o2) {
+            if (o1.isSpanEvent() || o2.isSpanEvent()) {
+                throw new IllegalArgumentException("Expecting only span messages");
+            } else {
+                if (o1.getSpanEventType().equals(o2.getSpanEventType())) {
+                    return o1.getKafkaTimestamp() < o2.getKafkaTimestamp() ? -1 : 1;
+                } else {
+                    return 1;
+                }
+            }
+        }
+    }
+
+    // best-effort comparator for ordering mixed set of user and span messages
+    private static class MixedMessageComparator<K, V> implements Comparator<ConsumerRecord<SpanData<K>, V>> {
+        // overall, should no return 0, as that will cause lose of events/messages
+        @Override
+        public int compare(ConsumerRecord<SpanData<K>, V> o1, ConsumerRecord<SpanData<K>, V> o2) {
+            if (o1.partition() == o2.partition()) {
+                // from same partition, no matter which topic they are in, order by offset
+                return o1.offset() < o2.offset() ? -1 : 1;
+            } else {
+                // from different partitions, lets use timestamp
+                if (o1.timestampType().equals(TimestampType.LOG_APPEND_TIME)
+                        && o2.timestampType().equals(TimestampType.LOG_APPEND_TIME)) {
+                    return o1.timestamp() < o2.timestamp() ? -1 : 1;
+                } else if (o1.timestampType().equals(TimestampType.CREATE_TIME)
+                        && o2.timestampType().equals(TimestampType.CREATE_TIME)) {
+                    // less ideal due to clock differences among clients
+                    return o1.timestamp() < o2.timestamp() ? -1 : 1;
+                } else {
+                    // so bad, let's roughly order them: move span BEGIN messages in front of span END
+                    // messages for the same span, regardless of their orders against user messages.
+                    SpanData<K> s1 = o1.key();
+                    SpanData<K> s2 = o2.key();
+                    if (s1 == null || s2 == null) {
+                        throw new IllegalArgumentException("null message key: o1=" + o1 + ", o2=" + o2);
+                    }
+                    if (s1.isSpanMessage() && s2.isSpanMessage() && s1.getSpanId().equals(s2.getSpanId())) {
+                        return (s1.getSpanEventType().equals(SpanConstants.SPAN_BEGIN)) ? -1 : 1;
+                    } else {
+                        return 1; // doesn't matter
+                    }
+                }
+            }
+        }
+    }
+
     private class UserOnlyIterable<K, V> implements Iterable<ConsumerRecord<K, V>> {
         private final Iterator<ConsumerRecord<SpanData<K>, V>> it;
 
@@ -415,57 +454,20 @@ public class SpanKafkaConsumer<K, V> implements Consumer<K, V> {
         }
     }
 
-    private class SpanIterable<K, V> implements Iterable<ConsumerRecord<K, V>> {
+    private class OrderedMixedIterable<K, V> implements Iterable<ConsumerRecord<K, V>> {
         private final SortedSet<ConsumerRecord<SpanData<K>, V>> sortedSet;
         private final SpanEventHandler spanEventHandler;
 
-        public SpanIterable(SpanEventHandler spanEventHandler, ConsumerRecords<SpanData<K>, V> consumerRecords) {
+        public OrderedMixedIterable(SpanEventHandler spanEventHandler, ConsumerRecords<SpanData<K>, V> consumerRecords) {
             if (processingMode.equals(SpanProcessingStrategy.Mode.ROUGH)) {
-                throw new IllegalStateException("SpanIterable is not supported in span processing mode "
+                throw new IllegalStateException("OrderedMixedIterable is not supported in span processing mode "
                         + processingMode.getName());
             }
             this.spanEventHandler = spanEventHandler;
 
-            // comparator
-            this.sortedSet = new TreeSet<>((ConsumerRecord<SpanData<K>, V> o1, ConsumerRecord<SpanData<K>, V> o2) -> {
-                SpanData<K> sad1 = o1.key();
-                SpanData<K> sad2 = o2.key();
-                if (sad1 != null && sad2 != null) {
-                    if (sad1.getGenerationTimestamp() < sad2.getGenerationTimestamp()) {
-                        return -1;
-                    } else if (sad1.getGenerationTimestamp() > sad2.getGenerationTimestamp()) {
-                        return 1;
-                    } else {
-                        TopicPartition tp1 = new TopicPartition(o1.topic(), o1.partition());
-                        TopicPartition tp2 = new TopicPartition(o2.topic(), o2.partition());
-                        if (tp1.equals(tp2)) {
-                            if (o1.offset() < o2.offset()) {
-                                return -1;
-                            } else {
-                                return 1;
-                            }
-                        } else {
-                            // not from same TP, and with same event generation timestamp
-                            // always put span begin event in front of span end event for the same span
-                            if (sad1.getSpanId() != null
-                                    && !sad1.getSpanId().equals(sad2.getSpanId())
-                                    && sad1.getSpanEventType() != null
-                                    && sad2.getSpanEventType() != null
-                                    && !sad1.getSpanEventType().equals(sad2.getSpanEventType())) {
-                                if (sad1.getSpanEventType().equals(SpanConstants.SPAN_BEGIN)) {
-                                    return -1;
-                                } else {
-                                    return 1;
-                                }
-                            } else {
-                                return 1;
-                            }
-                        }
-                    }
-                } else {
-                    throw new IllegalArgumentException("missing message key: o1=" + o1 + ", o2=" + o2);
-                }
-            });
+            // use this set to order user and span messages
+            this.sortedSet = new TreeSet<>(new MixedMessageComparator<>());
+
             for (ConsumerRecord<SpanData<K>, V> consumerRecord : consumerRecords) {
                 this.sortedSet.add(consumerRecord);
             }

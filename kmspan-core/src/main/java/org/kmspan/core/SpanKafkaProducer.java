@@ -26,7 +26,7 @@ import java.util.concurrent.TimeUnit;
  * for how these span messages are collected on consumer side to generate span events.
  */
 public class SpanKafkaProducer<K, V> implements Producer<K, V>, SpanMessageTrigger {
-    private KafkaProducer<SpanData<K>, V> delegate;
+    private KafkaProducer<SpanData<K>, V> rawKafkaProducer;
 
     public SpanKafkaProducer(Map<String, Object> configs, SpanDataSerDeser<K> ser) {
         this(configs, ser, null);
@@ -40,7 +40,7 @@ public class SpanKafkaProducer<K, V> implements Producer<K, V>, SpanMessageTrigg
         if (ser == null) {
             ser = new SpanDataSerDeser<>();
         }
-        delegate = new KafkaProducer<>(configs, ser, valueSerializer);
+        rawKafkaProducer = new KafkaProducer<>(configs, ser, valueSerializer);
     }
 
     public SpanKafkaProducer(Properties properties, SpanDataSerDeser<K> ser) {
@@ -55,7 +55,7 @@ public class SpanKafkaProducer<K, V> implements Producer<K, V>, SpanMessageTrigg
         if (ser == null) {
             ser = new SpanDataSerDeser<>();
         }
-        delegate = new KafkaProducer<>(properties, ser, valueSerializer);
+        rawKafkaProducer = new KafkaProducer<>(properties, ser, valueSerializer);
     }
 
     @Override
@@ -65,57 +65,46 @@ public class SpanKafkaProducer<K, V> implements Producer<K, V>, SpanMessageTrigg
 
     @Override
     public Future<RecordMetadata> send(ProducerRecord<K, V> record, Callback callback) {
-        ProducerRecord<SpanData<K>, V> newRecord = new ProducerRecord<SpanData<K>, V>(
-                record.topic(),
-                record.partition(),
-                record.timestamp(),
-                new SpanData<K>(System.currentTimeMillis(), record.key()),
-                record.value()
+        return rawKafkaProducer.send(
+                SpanMessageUtils.toUserMessage(record),
+                callback
         );
-        return delegate.send(newRecord, callback);
     }
 
     @Override
     public void flush() {
-        delegate.flush();
+        rawKafkaProducer.flush();
     }
 
     @Override
     public List<PartitionInfo> partitionsFor(String topic) {
-        return delegate.partitionsFor(topic);
+        return rawKafkaProducer.partitionsFor(topic);
     }
 
     @Override
     public Map<MetricName, ? extends Metric> metrics() {
-        return delegate.metrics();
+        return rawKafkaProducer.metrics();
     }
 
     @Override
     public void close() {
-        delegate.close();
+        rawKafkaProducer.close();
     }
 
     @Override
     public void close(long timeout, TimeUnit unit) {
-        delegate.close(timeout, unit);
+        rawKafkaProducer.close(timeout, unit);
     }
 
     @Override
     public void beginSpan(String topic, String spanId) {
         long timestamp = System.currentTimeMillis();
-        List<PartitionInfo> partitionInfoList = delegate.partitionsFor(topic);
+        List<PartitionInfo> partitionInfoList = rawKafkaProducer.partitionsFor(topic);
         for (PartitionInfo partitionInfo : partitionInfoList) {
-            delegate.send(
-                    new ProducerRecord<SpanData<K>, V>(
-                            topic,
-                            partitionInfo.partition(),
-                            timestamp,
-                            new SpanData<K>(
-                                    spanId,
-                                    SpanConstants.SPAN_BEGIN,
-                                    System.currentTimeMillis(),
-                                    (K) null),
-                            (V) null
+            rawKafkaProducer.send(
+                    SpanMessageUtils.toSpanMessage(
+                            new ProducerRecord<K, V>(topic, partitionInfo.partition(), timestamp, null, null),
+                            spanId, SpanConstants.SPAN_BEGIN
                     )
             );
         }
@@ -124,20 +113,12 @@ public class SpanKafkaProducer<K, V> implements Producer<K, V>, SpanMessageTrigg
     @Override
     public void endSpan(String topic, String spanId) {
         long timestamp = System.currentTimeMillis();
-        List<PartitionInfo> partitionInfoList = delegate.partitionsFor(topic);
+        List<PartitionInfo> partitionInfoList = rawKafkaProducer.partitionsFor(topic);
         for (PartitionInfo partitionInfo : partitionInfoList) {
-            delegate.send(
-                    new ProducerRecord<>(
-                            topic,
-                            partitionInfo.partition(),
-                            timestamp,
-                            new SpanData<K>(
-                                    spanId,
-                                    SpanConstants.SPAN_END,
-                                    System.currentTimeMillis(),
-                                    (K) null),
-                            (V) null
-                    )
+            rawKafkaProducer.send(
+                    SpanMessageUtils.toSpanMessage(
+                            new ProducerRecord<K, V>(topic, partitionInfo.partition(), timestamp, null, null),
+                            spanId, SpanConstants.SPAN_END)
             );
         }
     }

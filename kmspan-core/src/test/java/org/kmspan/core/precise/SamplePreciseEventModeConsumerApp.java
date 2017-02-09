@@ -23,7 +23,7 @@ import java.util.Properties;
  * generated here is using precise event mode, for this, please pay attention to the use of
  * {@link SpanKafkaConsumer#pollWithSpan(long) pollWithSpan(long)} method inside the
  * {@link #pollingLoopThread pollingLoopThread}'s {@link Thread#run() run()} method, and the
- * {@link org.kmspan.core.SpanKafkaConsumer.SpanIterable SpanIterable} returned by that method.
+ * {@link org.kmspan.core.SpanKafkaConsumer.SpanIterable OrderedMixedIterable} returned by that method.
  */
 public class SamplePreciseEventModeConsumerApp {
     private static Logger logger = LogManager.getLogger(SamplePreciseEventModeConsumerApp.class);

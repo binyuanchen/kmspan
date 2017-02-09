@@ -34,14 +34,14 @@ public class SpanProcessingStrategy {
          * precise mode means:
          * <p>
          * 1. user uses the {@link SpanKafkaConsumer#pollWithSpan(long) pollWithSpan} api, and get back a
-         * {@link org.kmspan.core.SpanKafkaConsumer.SpanIterable SpanIterable}, then user follows the regular way
-         * of iterating over this SpanIterable.
+         * {@link org.kmspan.core.SpanKafkaConsumer.SpanIterable OrderedMixedIterable}, then user follows the regular way
+         * of iterating over this OrderedMixedIterable.
          * 2. user can not use {@link SpanKafkaConsumer#poll(long) poll} api.
          * 3. internally, the {@link org.apache.kafka.clients.consumer.KafkaConsumer#poll(long) raw poll} api is
          * used to poll messages off the Kafka broker, which may contain only user messages or a mix of span messages
          * and user messages. For these messages, in precise mode: span messages (if any) and user messages (if any)
          * will be sorted together by {@link SpanData#generationTimestamp generation timestamp}, the order is then
-         * honored by the resulting {@link org.kmspan.core.SpanKafkaConsumer.SpanIterable SpanIterable}.
+         * honored by the resulting {@link org.kmspan.core.SpanKafkaConsumer.SpanIterable OrderedMixedIterable}.
          * <p>
          * Futher details on the 'precise' mode can be found out at github wiki
          * <a href="https://github.com/binyuanchen/kmspan/wiki/Internals-of-kmspan">kmspan wiki</a>

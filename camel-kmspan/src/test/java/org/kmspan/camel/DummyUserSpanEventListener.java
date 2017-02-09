@@ -13,9 +13,8 @@ public class DummyUserSpanEventListener implements SpanEventListener {
 
     @Override
     public void onSpanEvent(ConsumerSpanEvent consumerSpanEvent) {
-        logger.info("[span] event spanId={}, spanEventType={}, generationTime={}",
+        logger.info("[span] event spanId={}, spanEventType={}",
                 consumerSpanEvent.getSpanId(),
-                consumerSpanEvent.getSpanEventType(),
-                consumerSpanEvent.getGenerationTime());
+                consumerSpanEvent.getSpanEventType());
     }
 }

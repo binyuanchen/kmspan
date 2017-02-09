@@ -77,7 +77,6 @@ public class KafkaZKSpanEventHandler implements SpanEventHandler {
         for (ConsumerSpanEvent consumerSpanEvent : consumerSpanEvents) {
             String spanId = consumerSpanEvent.getSpanId();
             String spanEventType = consumerSpanEvent.getSpanEventType();
-            long generationTimestamp = consumerSpanEvent.getGenerationTime();
             String topic = consumerSpanEvent.getTopic();
             // TODO make 2 cases, async and sync
             if (spanEventType.equals(SpanConstants.SPAN_BEGIN)) {
@@ -113,7 +112,12 @@ public class KafkaZKSpanEventHandler implements SpanEventHandler {
                                 SpanConstants.SPAN_BEGIN, spanId);
                         // amplify this event
                         for (SpanEventListener listener : this.spanEventListeners) {
-                            listener.onSpanEvent(consumerSpanEvent);
+                            listener.onSpanEvent(
+                                    ConsumerSpanEvent.createSpanEvent(
+                                            consumerSpanEvent.getSpanId(),
+                                            consumerSpanEvent.getSpanEventType(),
+                                            consumerSpanEvent.getTopic())
+                                    );
                         }
                     }
                     // no 'else if', in this way, we also deal with the scenario when numberOfPartitions==1
@@ -184,7 +188,13 @@ public class KafkaZKSpanEventHandler implements SpanEventHandler {
                         logger.debug("[{}][end of span {}]",
                                 SpanConstants.SPAN_END, spanId);
                         for (SpanEventListener listener : this.spanEventListeners) {
-                            listener.onSpanEvent(consumerSpanEvent);
+                            listener.onSpanEvent(
+                                    ConsumerSpanEvent.createSpanEvent(
+                                            consumerSpanEvent.getSpanId(),
+                                            consumerSpanEvent.getSpanEventType(),
+                                            consumerSpanEvent.getTopic()
+                                    )
+                            );
                         }
                     } else if (collected > targetCount) {
                         // in this case, do not delete that node for debugging, TODO async if delete

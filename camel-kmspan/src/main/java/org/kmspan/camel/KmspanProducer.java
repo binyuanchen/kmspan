@@ -121,10 +121,9 @@ public class KmspanProducer extends DefaultProducer {
             if (spanKey.getSpanEventType() != null) {
                 if (spanEventHandler != null) {
                     spanEventHandler.handle(Arrays.asList(
-                            new ConsumerSpanEvent(
+                            ConsumerSpanEvent.createSpanEvent(
                                     spanKey.getSpanId(),
                                     spanKey.getSpanEventType(),
-                                    spanKey.getGenerationTimestamp(),
                                     topic
                             )
                     ));

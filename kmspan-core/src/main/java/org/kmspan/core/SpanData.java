@@ -1,35 +1,30 @@
 package org.kmspan.core;
 
 /**
- * This is the wire (for example, on Fafka) format of the key of a message in a span. This can be a
- * span event, or a user message. When {@link #spanEventType spanEventType} is {@code null}, this is
- * a user message, otherwise, this is a span event.
+ * This is the wire (on Kafka) format of the key of a message in a span. It is either a span message
+ * or a user message. Use this method {@link #isSpanMessage() isSpanMessage} to determine the nature
+ * of this message.
  * <p>
- * For Kafka, this
- * format applies to the
  */
 public class SpanData<T> {
     // a global (the scope of messaging cluster) unique id for a single span
     private String spanId;
     // if not null, the type of a span event, in case this is null, it is an user message
     private String spanEventType;
-    // the time in milliseconds when this message/event is generated
-    private long generationTimestamp;
     // the generic 'data', for Kafka, this is the actual message key that users want
     private T data;
 
     public SpanData() {
-        this.generationTimestamp = System.currentTimeMillis();
+        this(null, null, null);
     }
 
-    public SpanData(long generationTimestamp, T data) {
-        this(null, null, generationTimestamp, data);
+    public SpanData(T data) {
+        this(null, null, data);
     }
 
-    public SpanData(String spanId, String spanEventType, long generationTimestamp, T data) {
+    public SpanData(String spanId, String spanEventType, T data) {
         this.spanId = spanId;
         this.spanEventType = spanEventType;
-        this.generationTimestamp = generationTimestamp;
         this.data = data;
     }
 
@@ -39,10 +34,6 @@ public class SpanData<T> {
 
     public String getSpanEventType() {
         return spanEventType;
-    }
-
-    public long getGenerationTimestamp() {
-        return generationTimestamp;
     }
 
     public T getData() {
@@ -58,11 +49,15 @@ public class SpanData<T> {
         return "SpanData{" +
                 "spanId='" + spanId + '\'' +
                 ", spanEventType='" + spanEventType + '\'' +
-                ", generationTimestamp=" + generationTimestamp +
                 ", data=" + data +
                 '}';
     }
 
+    /**
+     * This is the current way of determine a wire message is a span message or a user message.
+     *
+     * @return
+     */
     public boolean isSpanMessage() {
         return getSpanEventType() != null;
     }

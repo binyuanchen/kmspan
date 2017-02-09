@@ -33,7 +33,6 @@ public class SpanDataKryoSerDserGeneralTest {
         Assert.assertNotNull(expected);
         Assert.assertEquals(actual.getSpanId(), expected.getSpanId());
         Assert.assertEquals(actual.getSpanEventType(), expected.getSpanEventType());
-        Assert.assertEquals(actual.getGenerationTimestamp(), expected.getGenerationTimestamp());
         Assert.assertEquals(actual.getData(), expected.getData());
     }
 
@@ -46,7 +45,7 @@ public class SpanDataKryoSerDserGeneralTest {
         UserKey userKey1 = new UserKey();
         userKey1.setKeyId("c");
         userKey1.setMeta(metaValueMap);
-        SpanData<UserKey> spanData = new SpanData<>("d", "e", System.currentTimeMillis(), userKey1);
+        SpanData<UserKey> spanData = new SpanData<>("d", "e", userKey1);
 
         byte[] persisted = null;
         Kryo kryo1 = new Kryo();
@@ -75,7 +74,7 @@ public class SpanDataKryoSerDserGeneralTest {
         UserKey userKey1 = new UserKey();
         userKey1.setKeyId("c");
         userKey1.setMeta(metaValueMap);
-        SpanData<UserKey> spanData = new SpanData<>("d", "e", System.currentTimeMillis(), userKey1);
+        SpanData<UserKey> spanData = new SpanData<>("d", "e", userKey1);
 
         byte[] persisted = null;
 
@@ -99,9 +98,7 @@ public class SpanDataKryoSerDserGeneralTest {
 
     @Test
     public void testSpanDataSerDserImplWithSimpleString() {
-        SpanData<String> stringSpanData = new SpanData<>(
-                "a", "b", System.currentTimeMillis(), "c"
-        );
+        SpanData<String> stringSpanData = new SpanData<>("a", "b", "c");
 
         SpanDataSerDeser<String> ser = new SpanDataSerDeser<>();
 
@@ -124,7 +121,7 @@ public class SpanDataKryoSerDserGeneralTest {
         UserKey userKey1 = new UserKey();
         userKey1.setKeyId("c");
         userKey1.setMeta(metaValueMap);
-        SpanData<UserKey> spanData = new SpanData<>("d", "e", System.currentTimeMillis(), userKey1);
+        SpanData<UserKey> spanData = new SpanData<>("d", "e", userKey1);
 
         SpanDataSerDeser<UserKey> ser = new SpanDataSerDeser<>();
         ser.kryoRegister(UserKey.class);
