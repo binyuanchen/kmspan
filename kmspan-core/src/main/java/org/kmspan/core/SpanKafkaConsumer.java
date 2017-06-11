@@ -17,13 +17,11 @@ import org.kmspan.core.serialization.SpanDataSerDeser;
 
 import java.util.*;
 import java.util.regex.Pattern;
-import java.util.stream.Collector;
-import java.util.stream.Collectors;
 
 /**
  * A {@link Consumer consumer} that delegation all communication with Kafka brokers to an internal
  * {@link KafkaConsumer raw consumer}. The raw consumer polls wire Kafka messages whose key are of
- * type {@code SpanData<K>}, but returns user messages whose key are of type {@code K} to the caller
+ * type {@code SpanKey<K>}, but returns user messages whose key are of type {@code K} to the caller
  * user code. As part of polling raw Kafka messages, span messages are identified and processed,
  * causing span events being generated. Depending on which interface is used, the span messages are
  * processed in two different modes: rough mode and precise mode. For rough mode, please see
@@ -39,7 +37,7 @@ import java.util.stream.Collectors;
 public class SpanKafkaConsumer<K, V> implements Consumer<K, V> {
     private static Logger logger = LogManager.getLogger(SpanKafkaConsumer.class);
 
-    private KafkaConsumer<SpanData<K>, V> rawKafkaConsumer;
+    private KafkaConsumer<SpanKey<K>, V> rawKafkaConsumer;
     private String spanZKQuorum;
     private CuratorFramework curatorFramework;
     private String spanBeginSCZPath;
@@ -222,7 +220,7 @@ public class SpanKafkaConsumer<K, V> implements Consumer<K, V> {
             remaining.clear();
         }
 
-        ConsumerRecords<SpanData<K>, V> wireRecords = rawKafkaConsumer.poll(timeout);
+        ConsumerRecords<SpanKey<K>, V> wireRecords = rawKafkaConsumer.poll(timeout);
 
         // span messages with some ordering
         TreeSet<ConsumerSpanEvent> newSpanMessages = new TreeSet<>(new SpanMessageComparator());
@@ -253,7 +251,7 @@ public class SpanKafkaConsumer<K, V> implements Consumer<K, V> {
                     + processingMode.getName());
         }
 
-        ConsumerRecords<SpanData<K>, V> wireRecords = rawKafkaConsumer.poll(timeout);
+        ConsumerRecords<SpanKey<K>, V> wireRecords = rawKafkaConsumer.poll(timeout);
 
         return hasAnySpanMessages(wireRecords) ?
                 new OrderedMixedIterable<>(kafkaZKSpanEventHandler, wireRecords).iterator() :
@@ -261,7 +259,7 @@ public class SpanKafkaConsumer<K, V> implements Consumer<K, V> {
     }
 
     // decides whether a poll of records contains any span messages
-    private boolean hasAnySpanMessages(ConsumerRecords<SpanData<K>, V> records) {
+    private boolean hasAnySpanMessages(ConsumerRecords<SpanKey<K>, V> records) {
         return records.partitions().parallelStream().flatMap(tp -> records.records(tp).parallelStream())
                 .anyMatch(cr -> cr.key().getSpanEventType() != null);
     }
@@ -398,10 +396,10 @@ public class SpanKafkaConsumer<K, V> implements Consumer<K, V> {
     }
 
     // best-effort comparator for ordering mixed set of user and span messages
-    private static class MixedMessageComparator<K, V> implements Comparator<ConsumerRecord<SpanData<K>, V>> {
+    private static class MixedMessageComparator<K, V> implements Comparator<ConsumerRecord<SpanKey<K>, V>> {
         // overall, should no return 0, as that will cause lose of events/messages
         @Override
-        public int compare(ConsumerRecord<SpanData<K>, V> o1, ConsumerRecord<SpanData<K>, V> o2) {
+        public int compare(ConsumerRecord<SpanKey<K>, V> o1, ConsumerRecord<SpanKey<K>, V> o2) {
             if (o1.partition() == o2.partition()) {
                 // from same partition, no matter which topic they are in, order by offset
                 return o1.offset() < o2.offset() ? -1 : 1;
@@ -417,8 +415,8 @@ public class SpanKafkaConsumer<K, V> implements Consumer<K, V> {
                 } else {
                     // so bad, let's roughly order them: move span BEGIN messages in front of span END
                     // messages for the same span, regardless of their orders against user messages.
-                    SpanData<K> s1 = o1.key();
-                    SpanData<K> s2 = o2.key();
+                    SpanKey<K> s1 = o1.key();
+                    SpanKey<K> s2 = o2.key();
                     if (s1 == null || s2 == null) {
                         throw new IllegalArgumentException("null message key: o1=" + o1 + ", o2=" + o2);
                     }
@@ -433,10 +431,10 @@ public class SpanKafkaConsumer<K, V> implements Consumer<K, V> {
     }
 
     private class UserOnlyIterable<K, V> implements Iterable<ConsumerRecord<K, V>> {
-        private final Iterator<ConsumerRecord<SpanData<K>, V>> it;
+        private final Iterator<ConsumerRecord<SpanKey<K>, V>> it;
 
         // assumes input iterator contains only user messages
-        public UserOnlyIterable(Iterator<ConsumerRecord<SpanData<K>, V>> it) {
+        public UserOnlyIterable(Iterator<ConsumerRecord<SpanKey<K>, V>> it) {
             this.it = it;
         }
 
@@ -455,10 +453,10 @@ public class SpanKafkaConsumer<K, V> implements Consumer<K, V> {
     }
 
     private class OrderedMixedIterable<K, V> implements Iterable<ConsumerRecord<K, V>> {
-        private final SortedSet<ConsumerRecord<SpanData<K>, V>> sortedSet;
+        private final SortedSet<ConsumerRecord<SpanKey<K>, V>> sortedSet;
         private final SpanEventHandler spanEventHandler;
 
-        public OrderedMixedIterable(SpanEventHandler spanEventHandler, ConsumerRecords<SpanData<K>, V> consumerRecords) {
+        public OrderedMixedIterable(SpanEventHandler spanEventHandler, ConsumerRecords<SpanKey<K>, V> consumerRecords) {
             if (processingMode.equals(SpanProcessingStrategy.Mode.ROUGH)) {
                 throw new IllegalStateException("OrderedMixedIterable is not supported in span processing mode "
                         + processingMode.getName());
@@ -468,7 +466,7 @@ public class SpanKafkaConsumer<K, V> implements Consumer<K, V> {
             // use this set to order user and span messages
             this.sortedSet = new TreeSet<>(new MixedMessageComparator<>());
 
-            for (ConsumerRecord<SpanData<K>, V> consumerRecord : consumerRecords) {
+            for (ConsumerRecord<SpanKey<K>, V> consumerRecord : consumerRecords) {
                 this.sortedSet.add(consumerRecord);
             }
         }
@@ -476,12 +474,12 @@ public class SpanKafkaConsumer<K, V> implements Consumer<K, V> {
         @Override
         public Iterator<ConsumerRecord<K, V>> iterator() {
             return new AbstractIterator<ConsumerRecord<K, V>>() {
-                Iterator<ConsumerRecord<SpanData<K>, V>> iter = sortedSet.iterator();
+                Iterator<ConsumerRecord<SpanKey<K>, V>> iter = sortedSet.iterator();
 
                 @Override
                 protected ConsumerRecord<K, V> makeNext() {
                     while (iter.hasNext()) {
-                        ConsumerRecord<SpanData<K>, V> record = iter.next();
+                        ConsumerRecord<SpanKey<K>, V> record = iter.next();
                         if (record.key().isSpanMessage()) {
                             // span event, process it inline (and in order)
                             spanEventHandler.handle(Arrays.asList(SpanMessageUtils.toSpanMessage(record)));

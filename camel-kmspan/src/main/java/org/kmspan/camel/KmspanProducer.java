@@ -9,7 +9,6 @@ import org.apache.camel.impl.DefaultProducer;
 import org.apache.curator.framework.CuratorFramework;
 import org.apache.curator.framework.CuratorFrameworkFactory;
 import org.apache.curator.retry.ExponentialBackoffRetry;
-import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.kmspan.core.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -100,7 +99,7 @@ public class KmspanProducer extends DefaultProducer {
         this.curatorFramework.close();
     }
 
-    // right now assuming the source is camel-kafka, whose message is (SpanData<K>, V)
+    // right now assuming the source is camel-kafka, whose message is (SpanKey<K>, V)
     @Override
     @SuppressWarnings("unchecked")
     public void process(Exchange exchange) throws Exception {
@@ -113,10 +112,10 @@ public class KmspanProducer extends DefaultProducer {
             if (keyObj == null) {
                 throw new Exception("No header " + KafkaConstants.KEY + " in exchange");
             }
-            if (!(keyObj instanceof SpanData)) {
+            if (!(keyObj instanceof SpanKey)) {
                 throw new Exception("key object is of wrong type " + keyObj.getClass());
             }
-            SpanData spanKey = (SpanData) keyObj;
+            SpanKey spanKey = (SpanKey) keyObj;
 
             if (spanKey.getSpanEventType() != null) {
                 if (spanEventHandler != null) {

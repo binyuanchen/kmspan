@@ -6,7 +6,7 @@ package org.kmspan.core;
  * of this message.
  * <p>
  */
-public class SpanData<T> {
+public class SpanKey<T> {
     // a global (the scope of messaging cluster) unique id for a single span
     private String spanId;
     // if not null, the type of a span event, in case this is null, it is an user message
@@ -14,15 +14,15 @@ public class SpanData<T> {
     // the generic 'data', for Kafka, this is the actual message key that users want
     private T data;
 
-    public SpanData() {
+    public SpanKey() {
         this(null, null, null);
     }
 
-    public SpanData(T data) {
+    public SpanKey(T data) {
         this(null, null, data);
     }
 
-    public SpanData(String spanId, String spanEventType, T data) {
+    public SpanKey(String spanId, String spanEventType, T data) {
         this.spanId = spanId;
         this.spanEventType = spanEventType;
         this.data = data;
@@ -46,7 +46,7 @@ public class SpanData<T> {
 
     @Override
     public String toString() {
-        return "SpanData{" +
+        return "SpanKey{" +
                 "spanId='" + spanId + '\'' +
                 ", spanEventType='" + spanEventType + '\'' +
                 ", data=" + data +

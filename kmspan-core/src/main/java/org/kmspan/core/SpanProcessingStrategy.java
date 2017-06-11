@@ -18,11 +18,11 @@ public class SpanProcessingStrategy {
          * used to poll messages off the Kafka broker, which may contain only user messages or a mix of span messages
          * and user messages. For these messages, in rough mode:
          * <p>
-         * 3.1 user messages are not sorted by {@link SpanData#generationTimestamp generation timestamp},
+         * 3.1 user messages are not sorted by {@link SpanKey#generationTimestamp generation timestamp},
          * <p>
-         * 3.2 the span BEGIN messages are sorted by {@link SpanData#generationTimestamp generation timestamp}, and are
+         * 3.2 the span BEGIN messages are sorted by {@link SpanKey#generationTimestamp generation timestamp}, and are
          * processed before the execution of the {@link org.kmspan.core.annotation.Spaned Spaned} annotated method,
-         * the span END message are sorted also {@link SpanData#generationTimestamp generation timestamp}, and are
+         * the span END message are sorted also {@link SpanKey#generationTimestamp generation timestamp}, and are
          * processed after the execution of the {@link org.kmspan.core.annotation.Spaned Spaned} annotated method.
          * <p>
          * Futher details on the 'rough' mode can be found out at github wiki
@@ -40,7 +40,7 @@ public class SpanProcessingStrategy {
          * 3. internally, the {@link org.apache.kafka.clients.consumer.KafkaConsumer#poll(long) raw poll} api is
          * used to poll messages off the Kafka broker, which may contain only user messages or a mix of span messages
          * and user messages. For these messages, in precise mode: span messages (if any) and user messages (if any)
-         * will be sorted together by {@link SpanData#generationTimestamp generation timestamp}, the order is then
+         * will be sorted together by {@link SpanKey#generationTimestamp generation timestamp}, the order is then
          * honored by the resulting {@link org.kmspan.core.SpanKafkaConsumer.SpanIterable OrderedMixedIterable}.
          * <p>
          * Futher details on the 'precise' mode can be found out at github wiki
@@ -103,7 +103,7 @@ public class SpanProcessingStrategy {
     public static enum SpanMessageOrdering {
         /**
          * If {@link org.apache.kafka.clients.consumer.KafkaConsumer#poll(long) poll} returns span messages,
-         * they will be processed in order of {@link SpanData#generationTimestamp generation time}.
+         * they will be processed in order of {@link SpanKey#generationTimestamp generation time}.
          */
         ORDERED
 
@@ -122,7 +122,7 @@ public class SpanProcessingStrategy {
     public static enum UserMessageOrdering {
         /**
          * The user messages returned by {@link org.apache.kafka.clients.consumer.KafkaConsumer#poll(long) poll} will
-         * be ordered {@link SpanData#generationTimestamp generation time} before being further returned to client
+         * be ordered {@link SpanKey#generationTimestamp generation time} before being further returned to client
          */
         ORDERED
 

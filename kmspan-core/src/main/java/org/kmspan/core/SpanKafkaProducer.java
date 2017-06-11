@@ -26,7 +26,7 @@ import java.util.concurrent.TimeUnit;
  * for how these span messages are collected on consumer side to generate span events.
  */
 public class SpanKafkaProducer<K, V> implements Producer<K, V>, SpanMessageTrigger {
-    private KafkaProducer<SpanData<K>, V> rawKafkaProducer;
+    private KafkaProducer<SpanKey<K>, V> rawKafkaProducer;
 
     public SpanKafkaProducer(Map<String, Object> configs, SpanDataSerDeser<K> ser) {
         this(configs, ser, null);

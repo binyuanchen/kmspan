@@ -2,12 +2,12 @@ package org.kmspan.core;
 
 public class SpanConstants {
     /**
-     * This identifies a message as the begin event of a span, see {@link SpanData#spanEventType}
+     * This identifies a message as the begin event of a span, see {@link SpanKey#spanEventType}
      */
     public final static String SPAN_BEGIN = "SPAN_BEGIN";
 
     /**
-     * This identifies a message as the end event of a span, see {@link SpanData#spanEventType}
+     * This identifies a message as the end event of a span, see {@link SpanKey#spanEventType}
      */
     public final static String SPAN_END = "SPAN_END";
 

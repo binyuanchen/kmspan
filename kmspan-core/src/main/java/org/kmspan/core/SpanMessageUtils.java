@@ -13,7 +13,7 @@ public class SpanMessageUtils {
      * @param <V>
      * @return
      */
-    public static <K, V> ConsumerRecord<K, V> toUserMessage(ConsumerRecord<SpanData<K>, V> wireMessage) {
+    public static <K, V> ConsumerRecord<K, V> toUserMessage(ConsumerRecord<SpanKey<K>, V> wireMessage) {
         if (!wireMessage.key().isSpanMessage()) {
             return new ConsumerRecord<>(wireMessage.topic(), wireMessage.partition(), wireMessage.offset(),
                     wireMessage.key().getData(), wireMessage.value());
@@ -29,7 +29,7 @@ public class SpanMessageUtils {
      * @param <V>
      * @return
      */
-    public static <K, V> ConsumerSpanEvent toSpanMessage(ConsumerRecord<SpanData<K>, V> wireMessage) {
+    public static <K, V> ConsumerSpanEvent toSpanMessage(ConsumerRecord<SpanKey<K>, V> wireMessage) {
         if (wireMessage.key().isSpanMessage()) {
             return ConsumerSpanEvent.createSpanMessage(wireMessage.timestampType(),
                     wireMessage.timestamp(), wireMessage.key().getSpanId(),
@@ -46,16 +46,16 @@ public class SpanMessageUtils {
      * @param <V>
      * @return
      */
-    public static <K, V> ProducerRecord<SpanData<K>, V> toUserMessage(ProducerRecord<K, V> record) {
+    public static <K, V> ProducerRecord<SpanKey<K>, V> toUserMessage(ProducerRecord<K, V> record) {
         return new ProducerRecord<>(record.topic(), record.partition(), record.timestamp(),
-                new SpanData<>(record.key()), record.value()
+                new SpanKey<>(record.key()), record.value()
         );
     }
 
-    public static <K, V> ProducerRecord<SpanData<K>, V> toSpanMessage(
+    public static <K, V> ProducerRecord<SpanKey<K>, V> toSpanMessage(
             ProducerRecord<K, V> record, String spanId, String spanMessageType) {
         return new ProducerRecord<>(record.topic(), record.partition(), record.timestamp(),
-                new SpanData<>(spanId, spanMessageType, record.key()), record.value()
+                new SpanKey<>(spanId, spanMessageType, record.key()), record.value()
         );
     }
 }

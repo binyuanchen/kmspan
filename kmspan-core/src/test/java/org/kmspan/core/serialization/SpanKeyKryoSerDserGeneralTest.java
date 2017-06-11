@@ -5,7 +5,7 @@ import com.esotericsoftware.kryo.io.Input;
 import com.esotericsoftware.kryo.io.Output;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
-import org.kmspan.core.SpanData;
+import org.kmspan.core.SpanKey;
 import org.mockito.MockitoAnnotations;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
@@ -16,8 +16,8 @@ import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.util.*;
 
-public class SpanDataKryoSerDserGeneralTest {
-    private static Logger logger = LogManager.getLogger(SpanDataKryoSerDserGeneralTest.class);
+public class SpanKeyKryoSerDserGeneralTest {
+    private static Logger logger = LogManager.getLogger(SpanKeyKryoSerDserGeneralTest.class);
 
     @BeforeClass
     public void setup() {
@@ -28,7 +28,7 @@ public class SpanDataKryoSerDserGeneralTest {
     public void cleanup() {
     }
 
-    private void verifySpanData(SpanData actual, SpanData expected) {
+    private void verifySpanData(SpanKey actual, SpanKey expected) {
         Assert.assertNotNull(actual);
         Assert.assertNotNull(expected);
         Assert.assertEquals(actual.getSpanId(), expected.getSpanId());
@@ -45,13 +45,13 @@ public class SpanDataKryoSerDserGeneralTest {
         UserKey userKey1 = new UserKey();
         userKey1.setKeyId("c");
         userKey1.setMeta(metaValueMap);
-        SpanData<UserKey> spanData = new SpanData<>("d", "e", userKey1);
+        SpanKey<UserKey> spanKey = new SpanKey<>("d", "e", userKey1);
 
         byte[] persisted = null;
         Kryo kryo1 = new Kryo();
         try (ByteArrayOutputStream baos = new ByteArrayOutputStream()) {
             Output output = new Output(baos);
-            kryo1.writeClassAndObject(output, spanData);
+            kryo1.writeClassAndObject(output, spanKey);
             output.flush();
             persisted = baos.toByteArray();
         } catch (IOException e) {
@@ -62,7 +62,7 @@ public class SpanDataKryoSerDserGeneralTest {
         Kryo kryo2 = new Kryo();
         Object result = kryo2.readClassAndObject(persistedInput);
 
-        verifySpanData((SpanData) result, spanData);
+        verifySpanData((SpanKey) result, spanKey);
     }
 
     @Test
@@ -74,7 +74,7 @@ public class SpanDataKryoSerDserGeneralTest {
         UserKey userKey1 = new UserKey();
         userKey1.setKeyId("c");
         userKey1.setMeta(metaValueMap);
-        SpanData<UserKey> spanData = new SpanData<>("d", "e", userKey1);
+        SpanKey<UserKey> spanKey = new SpanKey<>("d", "e", userKey1);
 
         byte[] persisted = null;
 
@@ -82,7 +82,7 @@ public class SpanDataKryoSerDserGeneralTest {
         Kryo kryo1 = new Kryo();
         try (ByteArrayOutputStream baos = new ByteArrayOutputStream()) {
             Output output = new Output(baos);
-            kryo1.writeObject(output, spanData);
+            kryo1.writeObject(output, spanKey);
             output.flush();
             persisted = baos.toByteArray();
         } catch (IOException e) {
@@ -92,24 +92,24 @@ public class SpanDataKryoSerDserGeneralTest {
         //deser
         Input persistedInput = new Input(persisted);
         Kryo kryo2 = new Kryo();
-        SpanData result = kryo2.readObject(persistedInput, SpanData.class);
-        verifySpanData(result, spanData);
+        SpanKey result = kryo2.readObject(persistedInput, SpanKey.class);
+        verifySpanData(result, spanKey);
     }
 
     @Test
     public void testSpanDataSerDserImplWithSimpleString() {
-        SpanData<String> stringSpanData = new SpanData<>("a", "b", "c");
+        SpanKey<String> stringSpanKey = new SpanKey<>("a", "b", "c");
 
         SpanDataSerDeser<String> ser = new SpanDataSerDeser<>();
 
         byte[] persisted = null;
-        persisted = ser.serialize("x", stringSpanData);
+        persisted = ser.serialize("x", stringSpanKey);
 
         SpanDataSerDeser<String> deser = new SpanDataSerDeser<>();
 
-        SpanData<String> result = deser.deserialize("y", persisted);
+        SpanKey<String> result = deser.deserialize("y", persisted);
 
-        verifySpanData(result, stringSpanData);
+        verifySpanData(result, stringSpanKey);
     }
 
     @Test
@@ -121,7 +121,7 @@ public class SpanDataKryoSerDserGeneralTest {
         UserKey userKey1 = new UserKey();
         userKey1.setKeyId("c");
         userKey1.setMeta(metaValueMap);
-        SpanData<UserKey> spanData = new SpanData<>("d", "e", userKey1);
+        SpanKey<UserKey> spanKey = new SpanKey<>("d", "e", userKey1);
 
         SpanDataSerDeser<UserKey> ser = new SpanDataSerDeser<>();
         ser.kryoRegister(UserKey.class);
@@ -129,15 +129,15 @@ public class SpanDataKryoSerDserGeneralTest {
         ser.kryoRegister(HashMap.class);
 
         byte[] persisted = null;
-        persisted = ser.serialize("x", spanData);
+        persisted = ser.serialize("x", spanKey);
 
         SpanDataSerDeser<UserKey> deser = new SpanDataSerDeser<>();
         deser.kryoRegister(UserKey.class);
         deser.kryoRegister(UserKeyMetaValue.class);
         deser.kryoRegister(HashMap.class);
 
-        SpanData<UserKey> result = deser.deserialize("y", persisted);
+        SpanKey<UserKey> result = deser.deserialize("y", persisted);
 
-        verifySpanData(result, spanData);
+        verifySpanData(result, spanKey);
     }
 }

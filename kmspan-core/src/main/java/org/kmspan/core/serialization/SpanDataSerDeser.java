@@ -5,17 +5,16 @@ import com.esotericsoftware.kryo.io.Input;
 import com.esotericsoftware.kryo.io.Output;
 import org.apache.kafka.common.serialization.Deserializer;
 import org.apache.kafka.common.serialization.Serializer;
-import org.kmspan.core.SpanData;
+import org.kmspan.core.SpanKey;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
-import java.util.HashMap;
 import java.util.Map;
 
 /**
  * The actual messages on the wire (say Kafka) contains
  */
-public class SpanDataSerDeser<T> implements Deserializer<SpanData<T>>, Serializer<SpanData<T>> {
+public class SpanDataSerDeser<T> implements Deserializer<SpanKey<T>>, Serializer<SpanKey<T>> {
 
     // TODO make it thread safe
     private Kryo kryo;
@@ -26,7 +25,7 @@ public class SpanDataSerDeser<T> implements Deserializer<SpanData<T>>, Serialize
 
     public SpanDataSerDeser() {
         kryo = new Kryo();
-        kryo.register(SpanData.class);
+        kryo.register(SpanKey.class);
     }
 
     @Override
@@ -35,12 +34,12 @@ public class SpanDataSerDeser<T> implements Deserializer<SpanData<T>>, Serialize
     }
 
     @Override
-    public SpanData<T> deserialize(String topic, byte[] data) {
-        return kryo.readObject(new Input(data), SpanData.class);
+    public SpanKey<T> deserialize(String topic, byte[] data) {
+        return kryo.readObject(new Input(data), SpanKey.class);
     }
 
     @Override
-    public byte[] serialize(String topic, SpanData<T> data) {
+    public byte[] serialize(String topic, SpanKey<T> data) {
         try (ByteArrayOutputStream baos = new ByteArrayOutputStream()) {
             Output output = new Output(baos);
             kryo.writeObject(output, data);
