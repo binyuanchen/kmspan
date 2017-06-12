@@ -10,7 +10,7 @@ public class SpanKey<T> {
     private String id;
     // if not null, the type of a span message, in case this is null, it is an user message
     private String type;
-    // the generic 'data', for Kafka, this is the actual message key that users want
+    // the user message key
     private T data;
 
     public SpanKey() {
