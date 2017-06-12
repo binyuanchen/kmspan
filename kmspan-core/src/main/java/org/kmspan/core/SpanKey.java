@@ -6,10 +6,17 @@ package org.kmspan.core;
  * <p>
  */
 public class SpanKey<T> {
-    // a global (in the scope of messaging cluster) unique id for a single span
+    /**
+     * a global (in the scope of messaging cluster) unique id for a single span
+     */
     private String id;
-    // if not null, the type of a span message, in case this is null, it is an user message
+
+    /**
+     * if not null, the type of a span message, in case this is null, it is an user message. Currently, there can
+     * be two types: {@link SpanConstants#SPAN_BEGIN SPAN_BEGIN} and {@link SpanConstants#SPAN_END SPAN_END}.
+     */
     private String type;
+
     // the user message key
     private T data;
 
