@@ -117,12 +117,12 @@ public class KmspanProducer extends DefaultProducer {
             }
             SpanKey spanKey = (SpanKey) keyObj;
 
-            if (spanKey.getSpanEventType() != null) {
+            if (spanKey.getType() != null) {
                 if (spanEventHandler != null) {
                     spanEventHandler.handle(Arrays.asList(
                             ConsumerSpanEvent.createSpanEvent(
-                                    spanKey.getSpanId(),
-                                    spanKey.getSpanEventType(),
+                                    spanKey.getId(),
+                                    spanKey.getType(),
                                     topic
                             )
                     ));

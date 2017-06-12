@@ -1,16 +1,15 @@
 package org.kmspan.core;
 
 /**
- * This is the wire (on Kafka) format of the key of a message in a span. It is either a span message
- * or a user message. Use this method {@link #isSpanMessage() isSpanMessage} to determine the nature
- * of this message.
+ * This is the wired format of the key of a message in a span that flows through the messaging framework (for example,
+ * Kafka). It is either a span message or a user message. Use method {@link #isSpan() isSpan} to differentiate.
  * <p>
  */
 public class SpanKey<T> {
-    // a global (the scope of messaging cluster) unique id for a single span
-    private String spanId;
-    // if not null, the type of a span event, in case this is null, it is an user message
-    private String spanEventType;
+    // a global (in the scope of messaging cluster) unique id for a single span
+    private String id;
+    // if not null, the type of a span message, in case this is null, it is an user message
+    private String type;
     // the generic 'data', for Kafka, this is the actual message key that users want
     private T data;
 
@@ -22,18 +21,18 @@ public class SpanKey<T> {
         this(null, null, data);
     }
 
-    public SpanKey(String spanId, String spanEventType, T data) {
-        this.spanId = spanId;
-        this.spanEventType = spanEventType;
+    public SpanKey(String spanId, String type, T data) {
+        this.id = spanId;
+        this.type = type;
         this.data = data;
     }
 
-    public String getSpanId() {
-        return spanId;
+    public String getId() {
+        return id;
     }
 
-    public String getSpanEventType() {
-        return spanEventType;
+    public String getType() {
+        return type;
     }
 
     public T getData() {
@@ -47,18 +46,16 @@ public class SpanKey<T> {
     @Override
     public String toString() {
         return "SpanKey{" +
-                "spanId='" + spanId + '\'' +
-                ", spanEventType='" + spanEventType + '\'' +
+                "id='" + id + '\'' +
+                ", type='" + type + '\'' +
                 ", data=" + data +
                 '}';
     }
 
     /**
-     * This is the current way of determine a wire message is a span message or a user message.
-     *
-     * @return
+     * @return true, if this message is a span message, false, if this message is a user message
      */
-    public boolean isSpanMessage() {
-        return getSpanEventType() != null;
+    public boolean isSpan() {
+        return getType() != null;
     }
 }

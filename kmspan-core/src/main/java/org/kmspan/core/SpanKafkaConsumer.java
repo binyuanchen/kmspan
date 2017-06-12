@@ -232,7 +232,7 @@ public class SpanKafkaConsumer<K, V> implements Consumer<K, V> {
         for (TopicPartition partition : wireRecords.partitions()) {
             newUserRecords.put(partition, new ArrayList<>());
             wireRecords.records(partition).stream().forEach(r -> {
-                if (r.key().isSpanMessage()) {
+                if (r.key().isSpan()) {
                     // TODO switch mode (if enabled, use annotation, else, process span event right here)
                     newSpanMessages.add(SpanMessageUtils.toSpanMessage(r));
                 } else {
@@ -261,7 +261,7 @@ public class SpanKafkaConsumer<K, V> implements Consumer<K, V> {
     // decides whether a poll of records contains any span messages
     private boolean hasAnySpanMessages(ConsumerRecords<SpanKey<K>, V> records) {
         return records.partitions().parallelStream().flatMap(tp -> records.records(tp).parallelStream())
-                .anyMatch(cr -> cr.key().getSpanEventType() != null);
+                .anyMatch(cr -> cr.key().getType() != null);
     }
 
     @Override
@@ -420,8 +420,8 @@ public class SpanKafkaConsumer<K, V> implements Consumer<K, V> {
                     if (s1 == null || s2 == null) {
                         throw new IllegalArgumentException("null message key: o1=" + o1 + ", o2=" + o2);
                     }
-                    if (s1.isSpanMessage() && s2.isSpanMessage() && s1.getSpanId().equals(s2.getSpanId())) {
-                        return (s1.getSpanEventType().equals(SpanConstants.SPAN_BEGIN)) ? -1 : 1;
+                    if (s1.isSpan() && s2.isSpan() && s1.getId().equals(s2.getId())) {
+                        return (s1.getType().equals(SpanConstants.SPAN_BEGIN)) ? -1 : 1;
                     } else {
                         return 1; // doesn't matter
                     }
@@ -480,7 +480,7 @@ public class SpanKafkaConsumer<K, V> implements Consumer<K, V> {
                 protected ConsumerRecord<K, V> makeNext() {
                     while (iter.hasNext()) {
                         ConsumerRecord<SpanKey<K>, V> record = iter.next();
-                        if (record.key().isSpanMessage()) {
+                        if (record.key().isSpan()) {
                             // span event, process it inline (and in order)
                             spanEventHandler.handle(Arrays.asList(SpanMessageUtils.toSpanMessage(record)));
                         } else {

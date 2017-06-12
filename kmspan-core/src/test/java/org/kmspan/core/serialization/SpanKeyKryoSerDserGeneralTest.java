@@ -31,8 +31,8 @@ public class SpanKeyKryoSerDserGeneralTest {
     private void verifySpanData(SpanKey actual, SpanKey expected) {
         Assert.assertNotNull(actual);
         Assert.assertNotNull(expected);
-        Assert.assertEquals(actual.getSpanId(), expected.getSpanId());
-        Assert.assertEquals(actual.getSpanEventType(), expected.getSpanEventType());
+        Assert.assertEquals(actual.getId(), expected.getId());
+        Assert.assertEquals(actual.getType(), expected.getType());
         Assert.assertEquals(actual.getData(), expected.getData());
     }
 

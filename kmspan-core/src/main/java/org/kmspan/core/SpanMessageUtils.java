@@ -14,7 +14,7 @@ public class SpanMessageUtils {
      * @return
      */
     public static <K, V> ConsumerRecord<K, V> toUserMessage(ConsumerRecord<SpanKey<K>, V> wireMessage) {
-        if (!wireMessage.key().isSpanMessage()) {
+        if (!wireMessage.key().isSpan()) {
             return new ConsumerRecord<>(wireMessage.topic(), wireMessage.partition(), wireMessage.offset(),
                     wireMessage.key().getData(), wireMessage.value());
         }
@@ -30,10 +30,10 @@ public class SpanMessageUtils {
      * @return
      */
     public static <K, V> ConsumerSpanEvent toSpanMessage(ConsumerRecord<SpanKey<K>, V> wireMessage) {
-        if (wireMessage.key().isSpanMessage()) {
+        if (wireMessage.key().isSpan()) {
             return ConsumerSpanEvent.createSpanMessage(wireMessage.timestampType(),
-                    wireMessage.timestamp(), wireMessage.key().getSpanId(),
-                    wireMessage.key().getSpanEventType(), wireMessage.topic());
+                    wireMessage.timestamp(), wireMessage.key().getId(),
+                    wireMessage.key().getType(), wireMessage.topic());
         }
         return null;
     }
