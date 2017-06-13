@@ -13,10 +13,10 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * An implementation of {@link SpanEventHandler SpanEventHandler} wherein handlers collaborate using Zookeeper.
+ * An implementation of {@link SpanMessageHandler SpanMessageHandler} wherein handlers collaborate using Zookeeper.
  */
-public class KafkaZKSpanEventHandler implements SpanEventHandler {
-    private static Logger logger = LogManager.getLogger(KafkaZKSpanEventHandler.class);
+public class KafkaZKSpanMessageHandler implements SpanMessageHandler {
+    private static Logger logger = LogManager.getLogger(KafkaZKSpanMessageHandler.class);
 
     private CuratorFramework curatorFramework;
     // TODO remove this and uses scTargetCount instead, this class should only depends on
@@ -29,18 +29,18 @@ public class KafkaZKSpanEventHandler implements SpanEventHandler {
 
     private List<SpanEventListener> spanEventListeners = new ArrayList<>();
 
-    public KafkaZKSpanEventHandler(CuratorFramework curatorFramework,
-                                   int scTargetCount,
-                                   String spanBeginSCZPath,
-                                   String spanEndSCZPath) {
+    public KafkaZKSpanMessageHandler(CuratorFramework curatorFramework,
+                                     int scTargetCount,
+                                     String spanBeginSCZPath,
+                                     String spanEndSCZPath) {
         this(curatorFramework, scTargetCount, spanBeginSCZPath, spanEndSCZPath, new ArrayList<>());
     }
 
-    public KafkaZKSpanEventHandler(CuratorFramework curatorFramework,
-                                   int scTargetCount,
-                                   String spanBeginSCZPath,
-                                   String spanEndSCZPath,
-                                   List<SpanEventListener> spanEventListeners) {
+    public KafkaZKSpanMessageHandler(CuratorFramework curatorFramework,
+                                     int scTargetCount,
+                                     String spanBeginSCZPath,
+                                     String spanEndSCZPath,
+                                     List<SpanEventListener> spanEventListeners) {
         this.curatorFramework = curatorFramework;
         this.scTargetCount = scTargetCount;
         this.spanBeginSCZPath = spanBeginSCZPath;
@@ -48,18 +48,18 @@ public class KafkaZKSpanEventHandler implements SpanEventHandler {
         this.spanEventListeners = spanEventListeners;
     }
 
-    public KafkaZKSpanEventHandler(CuratorFramework curatorFramework,
-                                   KafkaConsumer kafkaConsumer,
-                                   String spanBeginSCZPath,
-                                   String spanEndSCZPath) {
+    public KafkaZKSpanMessageHandler(CuratorFramework curatorFramework,
+                                     KafkaConsumer kafkaConsumer,
+                                     String spanBeginSCZPath,
+                                     String spanEndSCZPath) {
         this(curatorFramework, kafkaConsumer, spanBeginSCZPath, spanEndSCZPath, new ArrayList<>());
     }
 
-    public KafkaZKSpanEventHandler(CuratorFramework curatorFramework,
-                                   KafkaConsumer kafkaConsumer,
-                                   String spanBeginSCZPath,
-                                   String spanEndSCZPath,
-                                   List<SpanEventListener> spanEventListeners) {
+    public KafkaZKSpanMessageHandler(CuratorFramework curatorFramework,
+                                     KafkaConsumer kafkaConsumer,
+                                     String spanBeginSCZPath,
+                                     String spanEndSCZPath,
+                                     List<SpanEventListener> spanEventListeners) {
         this.curatorFramework = curatorFramework;
         this.kafkaConsumer = kafkaConsumer;
         this.spanBeginSCZPath = spanBeginSCZPath;

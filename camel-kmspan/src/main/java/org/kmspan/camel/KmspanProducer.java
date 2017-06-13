@@ -22,7 +22,7 @@ public class KmspanProducer extends DefaultProducer {
     // one listener that comes as a camel registry
     private SpanEventListener spanEventListener;
     // handler that can handle span events
-    private SpanEventHandler spanEventHandler;
+    private SpanMessageHandler spanMessageHandler;
     // handler uses this zookeeper client, now it is curator
     private CuratorFramework curatorFramework;
     // SC target count, must be the same as topic partition count.
@@ -75,7 +75,7 @@ public class KmspanProducer extends DefaultProducer {
                 .retryPolicy(new ExponentialBackoffRetry(1000, 3))
                 .build();
         this.curatorFramework.start();
-        this.spanEventHandler = new KafkaZKSpanEventHandler(
+        this.spanMessageHandler = new KafkaZKSpanMessageHandler(
                 this.curatorFramework,
                 this.scTargetCount,
                 endpoint.getConfiguration().getSpanSCBeginZPath(),
@@ -90,7 +90,7 @@ public class KmspanProducer extends DefaultProducer {
         } else {
             this.spanEventListener = (SpanEventListener) selObj;
         }
-        this.spanEventHandler.registerSpanEventListener(this.spanEventListener);
+        this.spanMessageHandler.registerSpanEventListener(this.spanEventListener);
     }
 
     @Override
@@ -118,8 +118,8 @@ public class KmspanProducer extends DefaultProducer {
             SpanKey spanKey = (SpanKey) keyObj;
 
             if (spanKey.getType() != null) {
-                if (spanEventHandler != null) {
-                    spanEventHandler.handle(Arrays.asList(
+                if (spanMessageHandler != null) {
+                    spanMessageHandler.handle(Arrays.asList(
                             ConsumerSpanEvent.createSpanEvent(
                                     spanKey.getId(),
                                     spanKey.getType(),

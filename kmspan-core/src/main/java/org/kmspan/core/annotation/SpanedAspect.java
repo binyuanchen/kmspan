@@ -27,7 +27,7 @@ public class SpanedAspect {
 
     @Before("execing() && sep()")
     public void preProcessSpaned() {
-        SpanEventHandler handler = SpanEventTLHolder.getSpanEventHandler();
+        SpanMessageHandler handler = SpanEventTLHolder.getSpanEventHandler();
         List<ConsumerSpanEvent> events = SpanEventTLHolder.getSpanEvents();
         if (events != null && !events.isEmpty()) {
             List<ConsumerSpanEvent> consumerSpanEventSubList = new ArrayList<>();
@@ -52,7 +52,7 @@ public class SpanedAspect {
 
     @After("execing() && sep()")
     public void postProcessSpaned() {
-        SpanEventHandler handler = SpanEventTLHolder.getSpanEventHandler();
+        SpanMessageHandler handler = SpanEventTLHolder.getSpanEventHandler();
         List<ConsumerSpanEvent> events = SpanEventTLHolder.getSpanEvents();
         if (events != null && !events.isEmpty()) {
             List<ConsumerSpanEvent> consumerSpanEventSubList = new ArrayList<>();

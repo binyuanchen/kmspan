@@ -22,7 +22,7 @@ import java.util.concurrent.TimeUnit;
  * A span begin or end message is multi-casted to each topic partition of a Kafka topic via
  * {@link #beginSpan(String, String) beginSpan} and {@link #endSpan(String, String) endSpan}
  * methods. See
- * {@link SpanKafkaConsumer SpanKafkaConsumer} and {@link SpanEventHandler SpanEventHandler}
+ * {@link SpanKafkaConsumer SpanKafkaConsumer} and {@link SpanMessageHandler SpanMessageHandler}
  * for how these span messages are collected on consumer side to generate span events.
  */
 public class SpanKafkaProducer<K, V> implements Producer<K, V>, SpanMessageTrigger {

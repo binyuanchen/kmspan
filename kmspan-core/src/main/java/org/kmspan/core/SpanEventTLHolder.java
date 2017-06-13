@@ -4,9 +4,9 @@ import java.util.ArrayList;
 import java.util.List;
 
 public class SpanEventTLHolder {
-    private static ThreadLocal<SpanEventHandler> spanEventHandler = new ThreadLocal<SpanEventHandler>() {
+    private static ThreadLocal<SpanMessageHandler> spanEventHandler = new ThreadLocal<SpanMessageHandler>() {
         @Override
-        protected SpanEventHandler initialValue() {
+        protected SpanMessageHandler initialValue() {
             return null;
         }
     };
@@ -17,11 +17,11 @@ public class SpanEventTLHolder {
         }
     };
 
-    public static SpanEventHandler getSpanEventHandler() {
+    public static SpanMessageHandler getSpanEventHandler() {
         return spanEventHandler.get();
     }
 
-    public static void setSpanEventHandler(SpanEventHandler handler) {
+    public static void setSpanEventHandler(SpanMessageHandler handler) {
         spanEventHandler.set(handler);
     }
 

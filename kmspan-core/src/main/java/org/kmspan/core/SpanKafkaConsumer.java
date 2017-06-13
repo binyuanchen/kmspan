@@ -48,7 +48,7 @@ public class SpanKafkaConsumer<K, V> implements Consumer<K, V> {
     private String spanEndSCZPath;
     private SpanProcessingStrategy.Mode processingMode = SpanProcessingStrategy.Mode.NRT;
 
-    private KafkaZKSpanEventHandler kafkaZKSpanEventHandler;
+    private KafkaZKSpanMessageHandler kafkaZKSpanEventHandler;
 
     public SpanKafkaConsumer(Map<String, Object> configs, BaseSpanKeySerializer<K> deser) {
         this(configs, deser, null);
@@ -86,7 +86,7 @@ public class SpanKafkaConsumer<K, V> implements Consumer<K, V> {
             deser = new BaseSpanKeySerializer<>();
         }
         rawKafkaConsumer = new KafkaConsumer<>(configs, deser, valueDeserializer);
-        kafkaZKSpanEventHandler = new KafkaZKSpanEventHandler(
+        kafkaZKSpanEventHandler = new KafkaZKSpanMessageHandler(
                 curatorFramework,
                 rawKafkaConsumer,
                 spanBeginSCZPath,
@@ -141,7 +141,7 @@ public class SpanKafkaConsumer<K, V> implements Consumer<K, V> {
             deser = new BaseSpanKeySerializer<>();
         }
         rawKafkaConsumer = new KafkaConsumer<>(properties, deser, valueDeserializer);
-        kafkaZKSpanEventHandler = new KafkaZKSpanEventHandler(
+        kafkaZKSpanEventHandler = new KafkaZKSpanMessageHandler(
                 curatorFramework,
                 rawKafkaConsumer,
                 spanBeginSCZPath,
@@ -458,14 +458,14 @@ public class SpanKafkaConsumer<K, V> implements Consumer<K, V> {
 
     private class OrderedMixedIterable<K, V> implements Iterable<ConsumerRecord<K, V>> {
         private final SortedSet<ConsumerRecord<SpanKey<K>, V>> sortedSet;
-        private final SpanEventHandler spanEventHandler;
+        private final SpanMessageHandler spanMessageHandler;
 
-        public OrderedMixedIterable(SpanEventHandler spanEventHandler, ConsumerRecords<SpanKey<K>, V> consumerRecords) {
+        public OrderedMixedIterable(SpanMessageHandler spanMessageHandler, ConsumerRecords<SpanKey<K>, V> consumerRecords) {
             if (processingMode.equals(SpanProcessingStrategy.Mode.NRT)) {
                 throw new IllegalStateException("OrderedMixedIterable is not supported in span processing mode "
                         + processingMode.getName());
             }
-            this.spanEventHandler = spanEventHandler;
+            this.spanMessageHandler = spanMessageHandler;
 
             // use this set to order user and span messages
             this.sortedSet = new TreeSet<>(new MixedMessageComparator<>());
@@ -486,7 +486,7 @@ public class SpanKafkaConsumer<K, V> implements Consumer<K, V> {
                         ConsumerRecord<SpanKey<K>, V> record = iter.next();
                         if (record.key().isSpan()) {
                             // span event, process it inline (and in order)
-                            spanEventHandler.handle(Arrays.asList(SpanMessageUtils.toSpanMessage(record)));
+                            spanMessageHandler.handle(Arrays.asList(SpanMessageUtils.toSpanMessage(record)));
                         } else {
                             // user message, transform
                             return SpanMessageUtils.toUserMessage(record);
