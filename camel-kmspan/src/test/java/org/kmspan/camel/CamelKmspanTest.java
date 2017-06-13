@@ -13,7 +13,6 @@ import org.apache.kafka.clients.producer.ProducerRecord;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.kmspan.core.SpanEvent;
-import org.kmspan.core.SpanMessage;
 import org.kmspan.core.SpanKafkaProducer;
 import org.kmspan.testutils.BaseTestUtil;
 import org.kmspan.testutils.LocalKafkaBroker;
@@ -162,26 +161,26 @@ public class CamelKmspanTest {
                                 from(kafkaUri)
                                         .to(kmspanUri)
                                         .process(
-                                        new Processor() {
-                                            @Override
-                                            public void process(Exchange exchange) throws Exception {
-                                                if (exchange.getIn() != null) {
-                                                    Message message = exchange.getIn();
-                                                    Long offset = (Long) message.getHeader(KafkaConstants.OFFSET);
-                                                    String topic = (String) message.getHeader(KafkaConstants.TOPIC);
-                                                    String k = null;
-                                                    if (message.getHeader(KafkaConstants.KEY) != null) {
-                                                        k = (String) message.getHeader(KafkaConstants.KEY);
+                                                new Processor() {
+                                                    @Override
+                                                    public void process(Exchange exchange) throws Exception {
+                                                        if (exchange.getIn() != null) {
+                                                            Message message = exchange.getIn();
+                                                            Long offset = (Long) message.getHeader(KafkaConstants.OFFSET);
+                                                            String topic = (String) message.getHeader(KafkaConstants.TOPIC);
+                                                            String k = null;
+                                                            if (message.getHeader(KafkaConstants.KEY) != null) {
+                                                                k = (String) message.getHeader(KafkaConstants.KEY);
+                                                            }
+                                                            String v = null;
+                                                            if (message.getBody() != null) {
+                                                                v = (String) message.getBody();
+                                                            }
+                                                            onUserMessage(k, v, offset, topic);
+                                                        }
                                                     }
-                                                    String v = null;
-                                                    if (message.getBody() != null) {
-                                                        v = (String) message.getBody();
-                                                    }
-                                                    onUserMessage(k, v, offset, topic);
                                                 }
-                                            }
-                                        }
-                                );
+                                        );
                             }
                         }
                 );

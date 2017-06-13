@@ -120,16 +120,16 @@ public class KmspanProducer extends DefaultProducer {
             if (spanKey.getType() != null) {
                 if (spanMessageHandler != null) {
                     spanMessageHandler.handle(Arrays.asList(
-                            SpanMessage.createSpanEvent(
-                                    spanKey.getId(),
-                                    spanKey.getType(),
-                                    topic
+                            // TODO how to get borker side timestamp, see RecordMetaData
+                            SpanMessage.createSpanMessage(
+                                    null, -1, spanKey.getId(), spanKey.getType(), topic
                             )
                     ));
                 }
-                // stop propagation of exchange
+                // stop propagation of exchange, span messages are handled
                 exchange.setProperty(Exchange.ROUTE_STOP, Boolean.TRUE);
             } else {
+                // user message, propagate it as <K, V>
                 exchange.getIn().setHeader(KafkaConstants.KEY, spanKey.getData());
 
                 // TODO what if there is Out?

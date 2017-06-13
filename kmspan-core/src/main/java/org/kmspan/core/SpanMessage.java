@@ -7,7 +7,9 @@ import org.apache.kafka.common.record.TimestampType;
  * a span message and a span event.
  */
 public class SpanMessage {
+    @Deprecated
     //the timestamp type of the raw Kafka message
+    // this is deprecated, see RecordMetadata
     private TimestampType kafkaTimestampType = null;
     //the timestamp of the raw Kafka message
     private long kafkaTimestamp = -1;
