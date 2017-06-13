@@ -48,7 +48,7 @@ public class SpanKafkaConsumer<K, V> implements Consumer<K, V> {
     private String spanEndSCZPath;
     private SpanProcessingStrategy.Mode processingMode = SpanProcessingStrategy.Mode.NRT;
 
-    private KafkaZKSpanMessageHandler kafkaZKSpanEventHandler;
+    private KafkaZookeeperSpanMessageHandler kafkaZKSpanEventHandler;
 
     public SpanKafkaConsumer(Map<String, Object> configs, BaseSpanKeySerializer<K> deser) {
         this(configs, deser, null);
@@ -86,7 +86,7 @@ public class SpanKafkaConsumer<K, V> implements Consumer<K, V> {
             deser = new BaseSpanKeySerializer<>();
         }
         rawKafkaConsumer = new KafkaConsumer<>(configs, deser, valueDeserializer);
-        kafkaZKSpanEventHandler = new KafkaZKSpanMessageHandler(
+        kafkaZKSpanEventHandler = new KafkaZookeeperSpanMessageHandler(
                 curatorFramework,
                 rawKafkaConsumer,
                 spanBeginSCZPath,
@@ -141,7 +141,7 @@ public class SpanKafkaConsumer<K, V> implements Consumer<K, V> {
             deser = new BaseSpanKeySerializer<>();
         }
         rawKafkaConsumer = new KafkaConsumer<>(properties, deser, valueDeserializer);
-        kafkaZKSpanEventHandler = new KafkaZKSpanMessageHandler(
+        kafkaZKSpanEventHandler = new KafkaZookeeperSpanMessageHandler(
                 curatorFramework,
                 rawKafkaConsumer,
                 spanBeginSCZPath,
@@ -218,7 +218,7 @@ public class SpanKafkaConsumer<K, V> implements Consumer<K, V> {
          */
         SpanEventTLHolder.setSpanEventHandler(kafkaZKSpanEventHandler);
         // TODO revisit this logic here: should we clear?
-        List<ConsumerSpanEvent> remaining = SpanEventTLHolder.getSpanEvents();
+        List<SpanMessage> remaining = SpanEventTLHolder.getSpanEvents();
         if (remaining != null && !remaining.isEmpty()) {
             logger.warn("will clear remaining span events = {}", remaining.size());
             remaining.clear();
@@ -227,7 +227,7 @@ public class SpanKafkaConsumer<K, V> implements Consumer<K, V> {
         ConsumerRecords<SpanKey<K>, V> wireRecords = rawKafkaConsumer.poll(timeout);
 
         // span messages with some ordering
-        TreeSet<ConsumerSpanEvent> newSpanMessages = new TreeSet<>(new SpanMessageComparator());
+        TreeSet<SpanMessage> newSpanMessages = new TreeSet<>(new SpanMessageComparator());
 
         // user messages
         Map<TopicPartition, List<ConsumerRecord<K, V>>> newUserRecords = new HashMap<>();
@@ -377,24 +377,26 @@ public class SpanKafkaConsumer<K, V> implements Consumer<K, V> {
         rawKafkaConsumer.wakeup();
     }
 
+    /**
+     * This comparator quickly sorts span messages in this way:
+     * <p>
+     * -1 no user messages are involved
+     * -2 all BEGIN messages are sorted
+     * -3 all END messages are sorted
+     * -4 no ordering between BEING messages and END messages
+     * <p>
+     * Purpose: to collect span messages and prepare for {@link org.kmspan.core.annotation.Spaned annotation} processing.
+     */
     // strictly speaking, the ordering here is very special:
-    // -1 no user messages are involved
-    // -2 all BEGIN messages are sorted
-    // -3 all END messages are sorted
-    // -4 no ordering between BEING messages and END messages
-    // this is only used to collect span messages and prepare for Spaned annotation processing.
-    private static class SpanMessageComparator implements Comparator<ConsumerSpanEvent> {
+    //
+    private static class SpanMessageComparator implements Comparator<SpanMessage> {
         // overall, should no return 0, as that will cause lose of events
         @Override
-        public int compare(ConsumerSpanEvent o1, ConsumerSpanEvent o2) {
-            if (o1.isSpanEvent() || o2.isSpanEvent()) {
-                throw new IllegalArgumentException("Expecting only span messages");
+        public int compare(SpanMessage o1, SpanMessage o2) {
+            if (o1.getSpanEventType().equals(o2.getSpanEventType())) {
+                return o1.getKafkaTimestamp() < o2.getKafkaTimestamp() ? -1 : 1;
             } else {
-                if (o1.getSpanEventType().equals(o2.getSpanEventType())) {
-                    return o1.getKafkaTimestamp() < o2.getKafkaTimestamp() ? -1 : 1;
-                } else {
-                    return 1;
-                }
+                return 1;
             }
         }
     }

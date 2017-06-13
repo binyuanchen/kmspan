@@ -12,7 +12,7 @@ public class SampleSpanEventListener implements SpanEventListener {
      * @param event
      */
     @Override
-    public void onSpanEvent(ConsumerSpanEvent event) {
+    public void onSpanEvent(SpanEvent event) {
         // here we simply log the event, but you may choose to, for example, raise an
         // event to UI, or persist the event into a datastore etc.
         logger.info("[span]consumer received span event: {}", event);

@@ -1,7 +1,5 @@
 package org.kmspan.camel;
 
-import java.util.*;
-
 import org.apache.camel.Exchange;
 import org.apache.camel.Message;
 import org.apache.camel.component.kafka.KafkaConstants;
@@ -12,6 +10,8 @@ import org.apache.curator.retry.ExponentialBackoffRetry;
 import org.kmspan.core.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import java.util.Arrays;
 
 public class KmspanProducer extends DefaultProducer {
     private static final Logger logger = LoggerFactory.getLogger(KmspanProducer.class);
@@ -75,7 +75,7 @@ public class KmspanProducer extends DefaultProducer {
                 .retryPolicy(new ExponentialBackoffRetry(1000, 3))
                 .build();
         this.curatorFramework.start();
-        this.spanMessageHandler = new KafkaZKSpanMessageHandler(
+        this.spanMessageHandler = new KafkaZookeeperSpanMessageHandler(
                 this.curatorFramework,
                 this.scTargetCount,
                 endpoint.getConfiguration().getSpanSCBeginZPath(),
@@ -120,7 +120,7 @@ public class KmspanProducer extends DefaultProducer {
             if (spanKey.getType() != null) {
                 if (spanMessageHandler != null) {
                     spanMessageHandler.handle(Arrays.asList(
-                            ConsumerSpanEvent.createSpanEvent(
+                            SpanMessage.createSpanEvent(
                                     spanKey.getId(),
                                     spanKey.getType(),
                                     topic

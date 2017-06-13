@@ -28,50 +28,50 @@ public class SpanedAspect {
     @Before("execing() && sep()")
     public void preProcessSpaned() {
         SpanMessageHandler handler = SpanEventTLHolder.getSpanEventHandler();
-        List<ConsumerSpanEvent> events = SpanEventTLHolder.getSpanEvents();
+        List<SpanMessage> events = SpanEventTLHolder.getSpanEvents();
         if (events != null && !events.isEmpty()) {
-            List<ConsumerSpanEvent> consumerSpanEventSubList = new ArrayList<>();
-            Iterator<ConsumerSpanEvent> it = events.iterator();
+            List<SpanMessage> spanMessageSubList = new ArrayList<>();
+            Iterator<SpanMessage> it = events.iterator();
             while (it.hasNext()) {
-                ConsumerSpanEvent consumerSpanEvent = it.next();
-                String spanEventType = consumerSpanEvent.getSpanEventType();
-                if (consumerSpanEvent != null && spanEventType.equals(SpanConstants.SPAN_BEGIN)) {
-                    consumerSpanEventSubList.add(consumerSpanEvent);
+                SpanMessage spanMessage = it.next();
+                String spanEventType = spanMessage.getSpanEventType();
+                if (spanMessage != null && spanEventType.equals(SpanConstants.SPAN_BEGIN)) {
+                    spanMessageSubList.add(spanMessage);
                     it.remove();
                 }
             }
 
-            logger.trace("preProcessSpaned: number of events = {}", consumerSpanEventSubList.size());
-            for (ConsumerSpanEvent se : consumerSpanEventSubList) {
+            logger.trace("preProcessSpaned: number of events = {}", spanMessageSubList.size());
+            for (SpanMessage se : spanMessageSubList) {
                 logger.trace("preProcessSpaned: event = {}", se.toString());
             }
 
-            handler.handle(consumerSpanEventSubList);
+            handler.handle(spanMessageSubList);
         }
     }
 
     @After("execing() && sep()")
     public void postProcessSpaned() {
         SpanMessageHandler handler = SpanEventTLHolder.getSpanEventHandler();
-        List<ConsumerSpanEvent> events = SpanEventTLHolder.getSpanEvents();
+        List<SpanMessage> events = SpanEventTLHolder.getSpanEvents();
         if (events != null && !events.isEmpty()) {
-            List<ConsumerSpanEvent> consumerSpanEventSubList = new ArrayList<>();
-            Iterator<ConsumerSpanEvent> it = events.iterator();
+            List<SpanMessage> spanMessageSubList = new ArrayList<>();
+            Iterator<SpanMessage> it = events.iterator();
             while (it.hasNext()) {
-                ConsumerSpanEvent consumerSpanEvent = it.next();
-                String spanEventType = consumerSpanEvent.getSpanEventType();
-                if (consumerSpanEvent != null && spanEventType.equals(SpanConstants.SPAN_END)) {
-                    consumerSpanEventSubList.add(consumerSpanEvent);
+                SpanMessage spanMessage = it.next();
+                String spanEventType = spanMessage.getSpanEventType();
+                if (spanMessage != null && spanEventType.equals(SpanConstants.SPAN_END)) {
+                    spanMessageSubList.add(spanMessage);
                     it.remove();
                 }
             }
 
-            logger.trace("postProcessSpaned: number of events = {}", consumerSpanEventSubList.size());
-            for (ConsumerSpanEvent se : consumerSpanEventSubList) {
+            logger.trace("postProcessSpaned: number of events = {}", spanMessageSubList.size());
+            for (SpanMessage se : spanMessageSubList) {
                 logger.trace("postProcessSpaned: event = {}", se.toString());
             }
 
-            handler.handle(consumerSpanEventSubList);
+            handler.handle(spanMessageSubList);
         }
     }
 }

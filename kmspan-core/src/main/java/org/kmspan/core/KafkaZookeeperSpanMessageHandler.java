@@ -13,10 +13,11 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * An implementation of {@link SpanMessageHandler SpanMessageHandler} wherein handlers collaborate using Zookeeper.
+ * An implementation of the {@link SpanMessageHandler handler} interface. It processes span messages from
+ * Kafka, all handlers collaborate using Zookeeper.
  */
-public class KafkaZKSpanMessageHandler implements SpanMessageHandler {
-    private static Logger logger = LogManager.getLogger(KafkaZKSpanMessageHandler.class);
+public class KafkaZookeeperSpanMessageHandler implements SpanMessageHandler {
+    private static Logger logger = LogManager.getLogger(KafkaZookeeperSpanMessageHandler.class);
 
     private CuratorFramework curatorFramework;
     // TODO remove this and uses scTargetCount instead, this class should only depends on
@@ -29,18 +30,18 @@ public class KafkaZKSpanMessageHandler implements SpanMessageHandler {
 
     private List<SpanEventListener> spanEventListeners = new ArrayList<>();
 
-    public KafkaZKSpanMessageHandler(CuratorFramework curatorFramework,
-                                     int scTargetCount,
-                                     String spanBeginSCZPath,
-                                     String spanEndSCZPath) {
+    public KafkaZookeeperSpanMessageHandler(CuratorFramework curatorFramework,
+                                            int scTargetCount,
+                                            String spanBeginSCZPath,
+                                            String spanEndSCZPath) {
         this(curatorFramework, scTargetCount, spanBeginSCZPath, spanEndSCZPath, new ArrayList<>());
     }
 
-    public KafkaZKSpanMessageHandler(CuratorFramework curatorFramework,
-                                     int scTargetCount,
-                                     String spanBeginSCZPath,
-                                     String spanEndSCZPath,
-                                     List<SpanEventListener> spanEventListeners) {
+    public KafkaZookeeperSpanMessageHandler(CuratorFramework curatorFramework,
+                                            int scTargetCount,
+                                            String spanBeginSCZPath,
+                                            String spanEndSCZPath,
+                                            List<SpanEventListener> spanEventListeners) {
         this.curatorFramework = curatorFramework;
         this.scTargetCount = scTargetCount;
         this.spanBeginSCZPath = spanBeginSCZPath;
@@ -48,18 +49,18 @@ public class KafkaZKSpanMessageHandler implements SpanMessageHandler {
         this.spanEventListeners = spanEventListeners;
     }
 
-    public KafkaZKSpanMessageHandler(CuratorFramework curatorFramework,
-                                     KafkaConsumer kafkaConsumer,
-                                     String spanBeginSCZPath,
-                                     String spanEndSCZPath) {
+    public KafkaZookeeperSpanMessageHandler(CuratorFramework curatorFramework,
+                                            KafkaConsumer kafkaConsumer,
+                                            String spanBeginSCZPath,
+                                            String spanEndSCZPath) {
         this(curatorFramework, kafkaConsumer, spanBeginSCZPath, spanEndSCZPath, new ArrayList<>());
     }
 
-    public KafkaZKSpanMessageHandler(CuratorFramework curatorFramework,
-                                     KafkaConsumer kafkaConsumer,
-                                     String spanBeginSCZPath,
-                                     String spanEndSCZPath,
-                                     List<SpanEventListener> spanEventListeners) {
+    public KafkaZookeeperSpanMessageHandler(CuratorFramework curatorFramework,
+                                            KafkaConsumer kafkaConsumer,
+                                            String spanBeginSCZPath,
+                                            String spanEndSCZPath,
+                                            List<SpanEventListener> spanEventListeners) {
         this.curatorFramework = curatorFramework;
         this.kafkaConsumer = kafkaConsumer;
         this.spanBeginSCZPath = spanBeginSCZPath;
@@ -73,11 +74,11 @@ public class KafkaZKSpanMessageHandler implements SpanMessageHandler {
     }
 
     @Override
-    public void handle(List<ConsumerSpanEvent> consumerSpanEvents) {
-        for (ConsumerSpanEvent consumerSpanEvent : consumerSpanEvents) {
-            String spanId = consumerSpanEvent.getSpanId();
-            String spanEventType = consumerSpanEvent.getSpanEventType();
-            String topic = consumerSpanEvent.getTopic();
+    public void handle(List<SpanMessage> spanMessages) {
+        for (SpanMessage spanMessage : spanMessages) {
+            String spanId = spanMessage.getSpanId();
+            String spanEventType = spanMessage.getSpanEventType();
+            String topic = spanMessage.getTopic();
             // TODO make 2 cases, async and sync
             if (spanEventType.equals(SpanConstants.SPAN_BEGIN)) {
                 int targetCount;
@@ -113,11 +114,8 @@ public class KafkaZKSpanMessageHandler implements SpanMessageHandler {
                         // amplify this event
                         for (SpanEventListener listener : this.spanEventListeners) {
                             listener.onSpanEvent(
-                                    ConsumerSpanEvent.createSpanEvent(
-                                            consumerSpanEvent.getSpanId(),
-                                            consumerSpanEvent.getSpanEventType(),
-                                            consumerSpanEvent.getTopic())
-                                    );
+                                    new SpanEvent(System.currentTimeMillis(),
+                                            spanMessage.getSpanId(), spanMessage.getSpanEventType(), spanMessage.getTopic()));
                         }
                     }
                     // no 'else if', in this way, we also deal with the scenario when numberOfPartitions==1
@@ -189,10 +187,10 @@ public class KafkaZKSpanMessageHandler implements SpanMessageHandler {
                                 SpanConstants.SPAN_END, spanId);
                         for (SpanEventListener listener : this.spanEventListeners) {
                             listener.onSpanEvent(
-                                    ConsumerSpanEvent.createSpanEvent(
-                                            consumerSpanEvent.getSpanId(),
-                                            consumerSpanEvent.getSpanEventType(),
-                                            consumerSpanEvent.getTopic()
+                                    new SpanEvent(System.currentTimeMillis(),
+                                            spanMessage.getSpanId(),
+                                            spanMessage.getSpanEventType(),
+                                            spanMessage.getTopic()
                                     )
                             );
                         }

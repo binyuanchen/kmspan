@@ -10,9 +10,9 @@ public class SpanEventTLHolder {
             return null;
         }
     };
-    private static ThreadLocal<List<ConsumerSpanEvent>> spanEvents = new ThreadLocal<List<ConsumerSpanEvent>>() {
+    private static ThreadLocal<List<SpanMessage>> spanEvents = new ThreadLocal<List<SpanMessage>>() {
         @Override
-        protected List<ConsumerSpanEvent> initialValue() {
+        protected List<SpanMessage> initialValue() {
             return new ArrayList<>();
         }
     };
@@ -25,7 +25,7 @@ public class SpanEventTLHolder {
         spanEventHandler.set(handler);
     }
 
-    public static List<ConsumerSpanEvent> getSpanEvents() {
+    public static List<SpanMessage> getSpanEvents() {
         return spanEvents.get();
     }
 }

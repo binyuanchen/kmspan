@@ -10,7 +10,7 @@ import java.util.List;
  * registerListener api first.
  */
 public interface SpanMessageHandler {
-    void handle(List<ConsumerSpanEvent> consumerSpanEvents);
+    void handle(List<SpanMessage> spanMessages);
 
     void registerSpanEventListener(SpanEventListener listener);
 }

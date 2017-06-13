@@ -29,9 +29,9 @@ public class SpanMessageUtils {
      * @param <V>
      * @return
      */
-    public static <K, V> ConsumerSpanEvent toSpanMessage(ConsumerRecord<SpanKey<K>, V> wireMessage) {
+    public static <K, V> SpanMessage toSpanMessage(ConsumerRecord<SpanKey<K>, V> wireMessage) {
         if (wireMessage.key().isSpan()) {
-            return ConsumerSpanEvent.createSpanMessage(wireMessage.timestampType(),
+            return SpanMessage.createSpanMessage(wireMessage.timestampType(),
                     wireMessage.timestamp(), wireMessage.key().getId(),
                     wireMessage.key().getType(), wireMessage.topic());
         }

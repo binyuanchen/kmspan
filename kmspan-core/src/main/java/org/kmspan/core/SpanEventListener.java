@@ -5,6 +5,5 @@ package org.kmspan.core;
  * to be called back when span events are generated.
  */
 public interface SpanEventListener {
-    // TODO create async ann
-    void onSpanEvent(ConsumerSpanEvent consumerSpanEvent);
+    void onSpanEvent(SpanEvent event);
 }

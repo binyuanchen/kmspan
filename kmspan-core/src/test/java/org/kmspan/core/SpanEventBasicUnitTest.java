@@ -97,7 +97,7 @@ public class SpanEventBasicUnitTest {
         verify(consumerAppSpy, times(num1 + num2))
                 .onUserMessage(anyString(), anyString(), anyInt(), anyString());
         // there are 4 span events, one BEGIN and one END for each of these 2 spans
-        verify(listenerSpy, times(4)).onSpanEvent(any(ConsumerSpanEvent.class));
+        verify(listenerSpy, times(4)).onSpanEvent(any(SpanEvent.class));
     }
 
     @Test
@@ -150,6 +150,6 @@ public class SpanEventBasicUnitTest {
         verify(consumerAppSpy, times(num1))
                 .onUserMessage(anyString(), anyString(), anyInt(), anyString());
         // there are two span events, one BEGIN and one END for this span
-        verify(listenerSpy, times(2)).onSpanEvent(any(ConsumerSpanEvent.class));
+        verify(listenerSpy, times(2)).onSpanEvent(any(SpanEvent.class));
     }
 }

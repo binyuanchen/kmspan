@@ -12,7 +12,8 @@ import org.apache.camel.impl.SimpleRegistry;
 import org.apache.kafka.clients.producer.ProducerRecord;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
-import org.kmspan.core.ConsumerSpanEvent;
+import org.kmspan.core.SpanEvent;
+import org.kmspan.core.SpanMessage;
 import org.kmspan.core.SpanKafkaProducer;
 import org.kmspan.testutils.BaseTestUtil;
 import org.kmspan.testutils.LocalKafkaBroker;
@@ -103,7 +104,7 @@ public class CamelKmspanTest {
         targetConsumerSpy.stopAndWait();
 
         verify(targetConsumerSpy, times(numOfMessagesForSpan1)).onUserMessage(anyString(), anyString(), anyInt(), anyString());
-        verify(targetUserSpanEventListenerSpy, times(2)).onSpanEvent(any(ConsumerSpanEvent.class));
+        verify(targetUserSpanEventListenerSpy, times(2)).onSpanEvent(any(SpanEvent.class));
     }
 
     public static class CamelKafkaConsumerAndListener {
