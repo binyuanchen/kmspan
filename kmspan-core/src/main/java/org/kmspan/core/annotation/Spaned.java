@@ -23,7 +23,7 @@ import java.lang.annotation.Target;
  * to do all calculations and processing on input
  * {@link org.apache.kafka.clients.consumer.ConsumerRecords records}.
  * <p>
- * This annotation helps to generate 'rough' span events. More details of 'rough' span events
+ * This annotation helps to generate 'nrt' span events. More details of 'nrt' span events
  * can be found in wiki of the kmspan at <a href="https://github.com/binyuanchen/kmspan/wiki">here</a>.
  */
 @Retention(RetentionPolicy.RUNTIME)

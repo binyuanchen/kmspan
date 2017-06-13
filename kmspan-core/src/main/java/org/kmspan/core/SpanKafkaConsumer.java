@@ -20,15 +20,19 @@ import java.util.regex.Pattern;
 
 /**
  * A {@link Consumer consumer} that delegation all communication with Kafka brokers to an internal
- * {@link KafkaConsumer raw consumer}. The raw consumer polls wire Kafka messages whose key are of
- * type {@code SpanKey<K>}, but returns user messages whose key are of type {@code K} to the caller
- * user code. As part of polling raw Kafka messages, span messages are identified and processed,
- * causing span events being generated. Depending on which interface is used, the span messages are
- * processed in two different modes: rough mode and precise mode. For rough mode, please see
- * {@link org.kmspan.core.annotation.Spaned Spaned} annotation, the aspect
- * {@link org.kmspan.core.annotation.SpanedAspect aspect} and the {@link #poll(long) poll} method.
- * For precised mode, please see {@link #pollWithSpan(long) pollWithSpan} method and
- * {@link OrderedMixedIterable iterable}. For more details on both, please see more details on kmspan wiki
+ * {@link KafkaConsumer raw consumer}. The raw consumer polls raw Kafka messages with key of type {@code SpanKey<K>},
+ * and returns user messages with key of type {@code K} to the caller. When polling raw Kafka messages, span
+ * messages are identified and processed, causing span events being generated. Depending on the setting of the
+ * {@link SpanProcessingStrategy.Mode mode}, different processing methods and constructs should be used.
+ * <p>
+ * For {@link SpanProcessingStrategy.Mode#NRT NRT mode}, please see {@link org.kmspan.core.annotation.Spaned Spaned}
+ * annotation, the {@link org.kmspan.core.annotation.SpanedAspect SpanedAspect} aspect and the
+ * {@link #poll(long) poll} method.
+ * <p>
+ * For {@link SpanProcessingStrategy.Mode#RT RT mode}, please see {@link #pollWithSpan(long) pollWithSpan} method and
+ * {@link OrderedMixedIterable iterable}.
+ * <p>
+ * For more details on both, please see more details on kmspan wiki
  * <a href="https://github.com/binyuanchen/kmspan/wiki">kmspan wiki</a>.
  *
  * @param <K> Type of the key of the user messages
@@ -42,7 +46,7 @@ public class SpanKafkaConsumer<K, V> implements Consumer<K, V> {
     private CuratorFramework curatorFramework;
     private String spanBeginSCZPath;
     private String spanEndSCZPath;
-    private SpanProcessingStrategy.Mode processingMode = SpanProcessingStrategy.Mode.ROUGH;
+    private SpanProcessingStrategy.Mode processingMode = SpanProcessingStrategy.Mode.NRT;
 
     private KafkaZKSpanEventHandler kafkaZKSpanEventHandler;
 
@@ -98,7 +102,7 @@ public class SpanKafkaConsumer<K, V> implements Consumer<K, V> {
                 processingMode = pmode;
             }
         } else {
-            processingMode = SpanProcessingStrategy.Mode.ROUGH;
+            processingMode = SpanProcessingStrategy.Mode.NRT;
         }
     }
 
@@ -153,7 +157,7 @@ public class SpanKafkaConsumer<K, V> implements Consumer<K, V> {
                 processingMode = pmode;
             }
         } else {
-            processingMode = SpanProcessingStrategy.Mode.ROUGH;
+            processingMode = SpanProcessingStrategy.Mode.NRT;
         }
     }
 
@@ -202,9 +206,9 @@ public class SpanKafkaConsumer<K, V> implements Consumer<K, V> {
 
     @Override
     public ConsumerRecords<K, V> poll(long timeout) {
-        // if you try to get span messages processed in precise mode, you should not
+        // if you try to get span messages processed in rt mode, you should not
         // use this api
-        if (processingMode.equals(SpanProcessingStrategy.Mode.PRECISE)) {
+        if (processingMode.equals(SpanProcessingStrategy.Mode.RT)) {
             throw new IllegalStateException("poll is not supported in span processing mode "
                     + processingMode.getName());
         }
@@ -246,7 +250,7 @@ public class SpanKafkaConsumer<K, V> implements Consumer<K, V> {
     }
 
     public Iterator<ConsumerRecord<K, V>> pollWithSpan(long timeout) {
-        if (processingMode.equals(SpanProcessingStrategy.Mode.ROUGH)) {
+        if (processingMode.equals(SpanProcessingStrategy.Mode.NRT)) {
             throw new IllegalStateException("pollWithSpan is not supported in span processing mode "
                     + processingMode.getName());
         }
@@ -413,7 +417,7 @@ public class SpanKafkaConsumer<K, V> implements Consumer<K, V> {
                     // less ideal due to clock differences among clients
                     return o1.timestamp() < o2.timestamp() ? -1 : 1;
                 } else {
-                    // so bad, let's roughly order them: move span BEGIN messages in front of span END
+                    // bad luck, let's order them heuristically: move span BEGIN messages in front of span END
                     // messages for the same span, regardless of their orders against user messages.
                     SpanKey<K> s1 = o1.key();
                     SpanKey<K> s2 = o2.key();
@@ -457,7 +461,7 @@ public class SpanKafkaConsumer<K, V> implements Consumer<K, V> {
         private final SpanEventHandler spanEventHandler;
 
         public OrderedMixedIterable(SpanEventHandler spanEventHandler, ConsumerRecords<SpanKey<K>, V> consumerRecords) {
-            if (processingMode.equals(SpanProcessingStrategy.Mode.ROUGH)) {
+            if (processingMode.equals(SpanProcessingStrategy.Mode.NRT)) {
                 throw new IllegalStateException("OrderedMixedIterable is not supported in span processing mode "
                         + processingMode.getName());
             }

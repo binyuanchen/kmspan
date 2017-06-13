@@ -2,8 +2,8 @@ package org.kmspan.core;
 
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
-import org.kmspan.core.precise.SampleRTModeConsumerApp;
-import org.kmspan.core.rough.SampleNRTModeConsumerApp;
+import org.kmspan.core.rt.SampleRTModeConsumerApp;
+import org.kmspan.core.nrt.SampleNRTModeConsumerApp;
 import org.kmspan.testutils.BaseTestUtil;
 import org.kmspan.testutils.LocalKafkaBroker;
 import org.kmspan.testutils.LocalZookeeperServer;
@@ -66,7 +66,7 @@ public class SpanEventBasicUnitTest {
         SampleSpanEventListener listenerSpy = spy(SampleSpanEventListener.class);
 
         // create a consumer that polls messages and consume them in a way so that span events
-        // are processed in 'rough mode', and spy on it
+        // are processed in 'nrt mode', and spy on it
         SampleNRTModeConsumerApp consumerApp = new SampleNRTModeConsumerApp(
                 zkServer.getRunningAddr(),
                 kafkaBroker.getRunningAddr(),
@@ -120,7 +120,7 @@ public class SpanEventBasicUnitTest {
         SampleSpanEventListener listenerSpy = spy(SampleSpanEventListener.class);
 
         // create a consumer that polls messages and consume them in a way so that span events are
-        // processed in 'precise mode', and spy on it
+        // processed in 'rt mode', and spy on it
         SampleRTModeConsumerApp consumerApp = new SampleRTModeConsumerApp(
                 zkServer.getRunningAddr(),
                 kafkaBroker.getRunningAddr(),

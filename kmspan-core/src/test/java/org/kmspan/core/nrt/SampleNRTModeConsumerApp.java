@@ -1,4 +1,4 @@
-package org.kmspan.core.precise;
+package org.kmspan.core.nrt;
 
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.clients.consumer.ConsumerRecords;
@@ -11,7 +11,6 @@ import org.kmspan.core.SpanKafkaConsumer;
 import org.kmspan.core.annotation.Spaned;
 
 import java.util.ArrayList;
-import java.util.Iterator;
 import java.util.List;
 import java.util.Properties;
 
@@ -19,13 +18,14 @@ import java.util.Properties;
  * This sample app demonstrates how user code uses {@link SpanKafkaConsumer SpanKafkaConsumer} to (1) consume
  * (from Kafka brokers) user messages (both message key and message value are of type String) in a span,
  * and (2) get notified when span events are generated from the stream of span messages. The span events
- * generated here is using precise event mode, for this, please pay attention to the use of
- * {@link SpanKafkaConsumer#pollWithSpan(long) pollWithSpan(long)} method inside the
- * {@link #pollingLoopThread pollingLoopThread}'s {@link Thread#run() run()} method, and the
- * {@link org.kmspan.core.SpanKafkaConsumer.SpanIterable OrderedMixedIterable} returned by that method.
+ * generated here is using nrt event mode, for this, please pay attention to the use of
+ * {@link SpanKafkaConsumer#poll(long) poll(long)} method inside the {@link #pollingLoopThread pollingLoopThread}'s
+ * {@link Thread#run() run()} method, as well as the
+ * {@link #onUserMessages(ConsumerRecords) onUserMessages(ConsumerRecords)} method which is annotated
+ * with the {@link Spaned Spaned} annotation.
  */
-public class SampleRTModeConsumerApp {
-    private static Logger logger = LogManager.getLogger(SampleRTModeConsumerApp.class);
+public class SampleNRTModeConsumerApp {
+    private static Logger logger = LogManager.getLogger(SampleNRTModeConsumerApp.class);
 
     private final String topic;
     private final int numOfPartitions;
@@ -50,11 +50,11 @@ public class SampleRTModeConsumerApp {
      * @param topic               The topic that the {@link #spanKafkaConsumer spanKafkaConsumer} will poll from
      * @param spanEventListener   A listener that user passed in to get notified on span events, if any
      */
-    public SampleRTModeConsumerApp(String zkServerRunningAddr,
-                                   String kafkaBrokerRunning,
-                                   int numOfPartitions,
-                                   String topic,
-                                   SpanEventListener spanEventListener) {
+    public SampleNRTModeConsumerApp(String zkServerRunningAddr,
+                                    String kafkaBrokerRunning,
+                                    int numOfPartitions,
+                                    String topic,
+                                    SpanEventListener spanEventListener) {
         this.zkServerRunningAddr = zkServerRunningAddr;
         this.kafkaBrokerRunningAddr = kafkaBrokerRunning;
         this.numOfPartitions = numOfPartitions;
@@ -66,7 +66,7 @@ public class SampleRTModeConsumerApp {
      * For ease of test, this method is used to start the spanKafkaConsumer polling loop.
      * A new thread is spawned to run the spanKafkaConsumer polling loop. Notice the fact
      * that the polling is done using {@link SpanKafkaConsumer#poll(long)} makes the span
-     * events being generate in 'rough' mode.
+     * events being generate in 'nrt' mode.
      */
     public void startConsumerLoop() {
         this.on = true;
@@ -88,8 +88,6 @@ public class SampleRTModeConsumerApp {
                 props.put(SpanConstants.SPAN_BEGIN_SC_ZPATH, SpanConstants.DEFAULT_SPAN_BEGIN_SC_ZPATH);
                 // the shared counter path for the span END, this is a path prefix
                 props.put(SpanConstants.SPAN_END_SC_ZPATH, SpanConstants.DEFAULT_SPAN_END_SC_ZPATH);
-                // set the span messages processing mode to PRECISE
-                props.put(SpanConstants.SPAN_PROCESSING_MODE, "precise");
 
                 // create a spanKafkaConsumer
                 spanKafkaConsumer = new SpanKafkaConsumer<>(props, null);
@@ -110,18 +108,10 @@ public class SampleRTModeConsumerApp {
                 logger.info("consumer will start polling loop");
                 int total = 0;
                 while (on) {
-                    // it is important to use pollWithSpan() instead of the regular poll(), then
-                    // iterate through each ConsumerRecord as below. Because as you iterate through
-                    // each of the record from this iterator, behind the scenes, span messages will
-                    // be processed and span events are generated.
-                    Iterator<ConsumerRecord<String, String>> it = spanKafkaConsumer.pollWithSpan(100);
-                    int delta = 0;
-                    while (it.hasNext()) {
-                        delta++;
-                        ConsumerRecord<String, String> record = it.next();
-                        onUserMessage(record.key(), record.value(), record.offset(), record.topic());
-                    }
+                    ConsumerRecords<String, String> records = spanKafkaConsumer.poll(100);
+                    int delta = records.count();
                     total += delta;
+                    onUserMessages(records);
                     if (delta > 0) {
                         logger.info("\ttotal user msgs = {}", total);
                     }

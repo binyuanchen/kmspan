@@ -35,7 +35,7 @@ public class SpanConstants {
     /**
      * The users of the kmspan framework must configure a zookeeper cluster quorum where all Zookeeper constructs that
      * the kmspan framework uses will be stored into. The key name of this quorum is 'span.zookeeper.quorum', the default
-     * value of this key is 'localhost:2181'.
+     * value of this key is 'localhost:2181', point to local zookeeper.
      */
     public final static String SPAN_ZK_QUORUM = "span.zookeeper.quorum";
     /**
@@ -45,8 +45,7 @@ public class SpanConstants {
     public final static String DEFAULT_SPAN_ZK_QUORUM = "localhost:2181";
 
     /**
-     * Please refer to {@link org.kmspan.core.SpanProcessingStrategy.Mode mode} for the reasoning
+     * Please refer to {@link org.kmspan.core.SpanProcessingStrategy.Mode mode}.
      */
     public final static String SPAN_PROCESSING_MODE = "span.processing.mode";
-    public final static String DEFAULT_SPAN_PROCESSING_MODE = "rough";
 }

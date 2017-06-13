@@ -4,7 +4,7 @@ package org.kmspan.core;
 public class SpanProcessingStrategy {
 
     /**
-     * The {@link #ROUGH rough} mode and {@link #PRECISE precise} mode are mutual exclusive.
+     * In one JVM, only one of The {@link #NRT NRT} mode and {@link #RT RT} mode are mutual exclusive can be chosen.
      */
     public enum Mode {
         /**
@@ -16,7 +16,7 @@ public class SpanProcessingStrategy {
          * pass the ConsumerRecords to a method annotated with {@link org.kmspan.core.annotation.Spaned Spaned}.
          * 3. internally, the {@link org.apache.kafka.clients.consumer.KafkaConsumer#poll(long) raw poll} api is
          * used to poll messages off the Kafka broker, which may contain only user messages or a mix of span messages
-         * and user messages. For these messages, in rough mode:
+         * and user messages. For these messages, in nrt mode:
          * <p>
          * 3.1 user messages are not sorted by {@link SpanKey#generationTimestamp generation timestamp},
          * <p>
@@ -25,13 +25,12 @@ public class SpanProcessingStrategy {
          * the span END message are sorted also {@link SpanKey#generationTimestamp generation timestamp}, and are
          * processed after the execution of the {@link org.kmspan.core.annotation.Spaned Spaned} annotated method.
          * <p>
-         * Futher details on the 'rough' mode can be found out at github wiki
-         * <a href="https://github.com/binyuanchen/kmspan/wiki/Internals-of-kmspan">kmspan wiki</a>
+         * This is the default mode.
          */
-        ROUGH("rough") // default
+        NRT("nrt")
 
         /**
-         * precise mode means:
+         * rt mode means:
          * <p>
          * 1. user uses the {@link SpanKafkaConsumer#pollWithSpan(long) pollWithSpan} api, and get back a
          * {@link org.kmspan.core.SpanKafkaConsumer.SpanIterable OrderedMixedIterable}, then user follows the regular way
@@ -39,19 +38,11 @@ public class SpanProcessingStrategy {
          * 2. user can not use {@link SpanKafkaConsumer#poll(long) poll} api.
          * 3. internally, the {@link org.apache.kafka.clients.consumer.KafkaConsumer#poll(long) raw poll} api is
          * used to poll messages off the Kafka broker, which may contain only user messages or a mix of span messages
-         * and user messages. For these messages, in precise mode: span messages (if any) and user messages (if any)
+         * and user messages. For these messages, in rt mode: span messages (if any) and user messages (if any)
          * will be sorted together by {@link SpanKey#generationTimestamp generation timestamp}, the order is then
          * honored by the resulting {@link org.kmspan.core.SpanKafkaConsumer.SpanIterable OrderedMixedIterable}.
-         * <p>
-         * Futher details on the 'precise' mode can be found out at github wiki
-         * <a href="https://github.com/binyuanchen/kmspan/wiki/Internals-of-kmspan">kmspan wiki</a>
          */
-        , PRECISE("precise")
-
-        /**
-         *
-         */
-        ;
+        , RT("rt");
 
         private final String name;
 
