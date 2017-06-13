@@ -19,9 +19,9 @@ import java.util.concurrent.*;
  * serialize and deserialize its own messages. The messages keys for each worker must be different to
  * see if conflicts can happen.
  */
-public class SpanKeyKryoSerDserMultiThreadedTest {
+public class SpanKeySerializationMultiThreadedTest {
     private static final int NUM_WORKERS = 100;
-    private static Logger LOG = LogManager.getLogger(SpanKeyKryoSerDserMultiThreadedTest.class);
+    private static Logger LOG = LogManager.getLogger(SpanKeySerializationMultiThreadedTest.class);
     private ExecutorService executorService = Executors.newFixedThreadPool(NUM_WORKERS);
 
     private StringUserKeySerDeser serDeser = new StringUserKeySerDeser();
@@ -49,7 +49,7 @@ public class SpanKeyKryoSerDserMultiThreadedTest {
         }
     }
 
-    private static class StringUserKeySerDeser extends SpanDataSerDeser<String> {
+    private static class StringUserKeySerDeser extends BaseSpanKeySerializer<String> {
     }
 
     private static class Worker implements Callable<Boolean> {

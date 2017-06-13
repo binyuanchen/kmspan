@@ -16,8 +16,8 @@ import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.util.*;
 
-public class SpanKeyKryoSerDserGeneralTest {
-    private static Logger logger = LogManager.getLogger(SpanKeyKryoSerDserGeneralTest.class);
+public class SpanKeySerializationGeneralTest {
+    private static Logger logger = LogManager.getLogger(SpanKeySerializationGeneralTest.class);
 
     @BeforeClass
     public void setup() {
@@ -100,12 +100,12 @@ public class SpanKeyKryoSerDserGeneralTest {
     public void testSpanDataSerDserImplWithSimpleString() {
         SpanKey<String> stringSpanKey = new SpanKey<>("a", "b", "c");
 
-        SpanDataSerDeser<String> ser = new SpanDataSerDeser<>();
+        BaseSpanKeySerializer<String> ser = new BaseSpanKeySerializer<>();
 
         byte[] persisted = null;
         persisted = ser.serialize("x", stringSpanKey);
 
-        SpanDataSerDeser<String> deser = new SpanDataSerDeser<>();
+        BaseSpanKeySerializer<String> deser = new BaseSpanKeySerializer<>();
 
         SpanKey<String> result = deser.deserialize("y", persisted);
 
@@ -123,7 +123,7 @@ public class SpanKeyKryoSerDserGeneralTest {
         userKey1.setMeta(metaValueMap);
         SpanKey<UserKey> spanKey = new SpanKey<>("d", "e", userKey1);
 
-        SpanDataSerDeser<UserKey> ser = new SpanDataSerDeser<>();
+        BaseSpanKeySerializer<UserKey> ser = new BaseSpanKeySerializer<>();
         ser.kryoRegister(UserKey.class);
         ser.kryoRegister(UserKeyMetaValue.class);
         ser.kryoRegister(HashMap.class);
@@ -131,7 +131,7 @@ public class SpanKeyKryoSerDserGeneralTest {
         byte[] persisted = null;
         persisted = ser.serialize("x", spanKey);
 
-        SpanDataSerDeser<UserKey> deser = new SpanDataSerDeser<>();
+        BaseSpanKeySerializer<UserKey> deser = new BaseSpanKeySerializer<>();
         deser.kryoRegister(UserKey.class);
         deser.kryoRegister(UserKeyMetaValue.class);
         deser.kryoRegister(HashMap.class);

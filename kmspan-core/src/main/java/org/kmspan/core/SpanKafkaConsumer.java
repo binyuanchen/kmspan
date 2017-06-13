@@ -13,7 +13,7 @@ import org.apache.kafka.common.serialization.Deserializer;
 import org.apache.kafka.common.utils.AbstractIterator;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
-import org.kmspan.core.serialization.SpanDataSerDeser;
+import org.kmspan.core.serialization.BaseSpanKeySerializer;
 
 import java.util.*;
 import java.util.regex.Pattern;
@@ -46,11 +46,11 @@ public class SpanKafkaConsumer<K, V> implements Consumer<K, V> {
 
     private KafkaZKSpanEventHandler kafkaZKSpanEventHandler;
 
-    public SpanKafkaConsumer(Map<String, Object> configs, SpanDataSerDeser<K> deser) {
+    public SpanKafkaConsumer(Map<String, Object> configs, BaseSpanKeySerializer<K> deser) {
         this(configs, deser, null);
     }
 
-    public SpanKafkaConsumer(Map<String, Object> configs, SpanDataSerDeser<K> deser, Deserializer<V> valueDeserializer) {
+    public SpanKafkaConsumer(Map<String, Object> configs, BaseSpanKeySerializer<K> deser, Deserializer<V> valueDeserializer) {
         if (configs.containsKey(ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG)) {
             throw new IllegalArgumentException(
                     "key " + ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG + " is not customizable."
@@ -79,7 +79,7 @@ public class SpanKafkaConsumer<K, V> implements Consumer<K, V> {
             spanEndSCZPath = SpanConstants.DEFAULT_SPAN_END_SC_ZPATH;
         }
         if (deser == null) {
-            deser = new SpanDataSerDeser<>();
+            deser = new BaseSpanKeySerializer<>();
         }
         rawKafkaConsumer = new KafkaConsumer<>(configs, deser, valueDeserializer);
         kafkaZKSpanEventHandler = new KafkaZKSpanEventHandler(
@@ -102,11 +102,11 @@ public class SpanKafkaConsumer<K, V> implements Consumer<K, V> {
         }
     }
 
-    public SpanKafkaConsumer(Properties properties, SpanDataSerDeser<K> deser) {
+    public SpanKafkaConsumer(Properties properties, BaseSpanKeySerializer<K> deser) {
         this(properties, deser, null);
     }
 
-    public SpanKafkaConsumer(Properties properties, SpanDataSerDeser<K> deser, Deserializer<V> valueDeserializer) {
+    public SpanKafkaConsumer(Properties properties, BaseSpanKeySerializer<K> deser, Deserializer<V> valueDeserializer) {
         if (properties.contains(ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG)) {
             throw new IllegalArgumentException(
                     "key " + ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG + " is not customizable."
@@ -134,7 +134,7 @@ public class SpanKafkaConsumer<K, V> implements Consumer<K, V> {
             spanEndSCZPath = SpanConstants.DEFAULT_SPAN_END_SC_ZPATH;
         }
         if (deser == null) {
-            deser = new SpanDataSerDeser<>();
+            deser = new BaseSpanKeySerializer<>();
         }
         rawKafkaConsumer = new KafkaConsumer<>(properties, deser, valueDeserializer);
         kafkaZKSpanEventHandler = new KafkaZKSpanEventHandler(

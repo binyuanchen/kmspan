@@ -17,7 +17,7 @@ import java.util.Map;
  * The base serializer and de-serializer template of {@link SpanKey span key} who carries user message key of
  * type {@link T}. For example of using this template, see tests of this class.
  */
-public class SpanDataSerDeser<T> implements Deserializer<SpanKey<T>>, Serializer<SpanKey<T>> {
+public class BaseSpanKeySerializer<T> implements Deserializer<SpanKey<T>>, Serializer<SpanKey<T>> {
 
     private final static List<Class> clazzes = new ArrayList<>();
 
@@ -31,7 +31,7 @@ public class SpanDataSerDeser<T> implements Deserializer<SpanKey<T>>, Serializer
         }
     };
 
-    public SpanDataSerDeser() {
+    public BaseSpanKeySerializer() {
         clazzes.add(SpanKey.class);
     }
 

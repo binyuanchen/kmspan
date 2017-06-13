@@ -5,7 +5,7 @@ import org.apache.kafka.common.Metric;
 import org.apache.kafka.common.MetricName;
 import org.apache.kafka.common.PartitionInfo;
 import org.apache.kafka.common.serialization.Serializer;
-import org.kmspan.core.serialization.SpanDataSerDeser;
+import org.kmspan.core.serialization.BaseSpanKeySerializer;
 
 import java.util.List;
 import java.util.Map;
@@ -28,32 +28,32 @@ import java.util.concurrent.TimeUnit;
 public class SpanKafkaProducer<K, V> implements Producer<K, V>, SpanMessageTrigger {
     private KafkaProducer<SpanKey<K>, V> rawKafkaProducer;
 
-    public SpanKafkaProducer(Map<String, Object> configs, SpanDataSerDeser<K> ser) {
+    public SpanKafkaProducer(Map<String, Object> configs, BaseSpanKeySerializer<K> ser) {
         this(configs, ser, null);
     }
 
-    public SpanKafkaProducer(Map<String, Object> configs, SpanDataSerDeser<K> ser, Serializer<V> valueSerializer) {
+    public SpanKafkaProducer(Map<String, Object> configs, BaseSpanKeySerializer<K> ser, Serializer<V> valueSerializer) {
         if (configs.containsKey(ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG)) {
             throw new IllegalArgumentException(
                     "key " + ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG + " is not customizable.");
         }
         if (ser == null) {
-            ser = new SpanDataSerDeser<>();
+            ser = new BaseSpanKeySerializer<>();
         }
         rawKafkaProducer = new KafkaProducer<>(configs, ser, valueSerializer);
     }
 
-    public SpanKafkaProducer(Properties properties, SpanDataSerDeser<K> ser) {
+    public SpanKafkaProducer(Properties properties, BaseSpanKeySerializer<K> ser) {
         this(properties, ser, null);
     }
 
-    public SpanKafkaProducer(Properties properties, SpanDataSerDeser<K> ser, Serializer<V> valueSerializer) {
+    public SpanKafkaProducer(Properties properties, BaseSpanKeySerializer<K> ser, Serializer<V> valueSerializer) {
         if (properties.containsKey(ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG)) {
             throw new IllegalArgumentException(
                     "key " + ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG + " is not customizable.");
         }
         if (ser == null) {
-            ser = new SpanDataSerDeser<>();
+            ser = new BaseSpanKeySerializer<>();
         }
         rawKafkaProducer = new KafkaProducer<>(properties, ser, valueSerializer);
     }

@@ -5,7 +5,6 @@ import org.apache.kafka.clients.consumer.ConsumerRecords;
 import org.apache.kafka.common.TopicPartition;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
-import org.kmspan.core.ConsumerSpanEvent;
 import org.kmspan.core.SpanConstants;
 import org.kmspan.core.SpanEventListener;
 import org.kmspan.core.SpanKafkaConsumer;
@@ -25,8 +24,8 @@ import java.util.Properties;
  * {@link #onUserMessages(ConsumerRecords) onUserMessages(ConsumerRecords)} method which is annotated
  * with the {@link Spaned Spaned} annotation.
  */
-public class SampleRoughEventModeConsumerApp {
-    private static Logger logger = LogManager.getLogger(SampleRoughEventModeConsumerApp.class);
+public class SampleNRTModeConsumerApp {
+    private static Logger logger = LogManager.getLogger(SampleNRTModeConsumerApp.class);
 
     private final String topic;
     private final int numOfPartitions;
@@ -51,11 +50,11 @@ public class SampleRoughEventModeConsumerApp {
      * @param topic               The topic that the {@link #spanKafkaConsumer spanKafkaConsumer} will poll from
      * @param spanEventListener   A listener that user passed in to get notified on span events, if any
      */
-    public SampleRoughEventModeConsumerApp(String zkServerRunningAddr,
-                                           String kafkaBrokerRunning,
-                                           int numOfPartitions,
-                                           String topic,
-                                           SpanEventListener spanEventListener) {
+    public SampleNRTModeConsumerApp(String zkServerRunningAddr,
+                                    String kafkaBrokerRunning,
+                                    int numOfPartitions,
+                                    String topic,
+                                    SpanEventListener spanEventListener) {
         this.zkServerRunningAddr = zkServerRunningAddr;
         this.kafkaBrokerRunningAddr = kafkaBrokerRunning;
         this.numOfPartitions = numOfPartitions;
@@ -81,7 +80,7 @@ public class SampleRoughEventModeConsumerApp {
                 props.put("enable.auto.commit", "true");
                 props.put("auto.commit.interval.ms", "200");
                 // property "key.deserializer" is disabled by SpanKafkaConsumer, currently, the key
-                // is deserialized using the SpanDataSerDeser
+                // is deserialized using the BaseSpanKeySerializer
                 props.put("value.deserializer", "org.apache.kafka.common.serialization.StringDeserializer");
                 // kmspan uses this zookeeper for storage of shared counter
                 props.put(SpanConstants.SPAN_ZK_QUORUM, zkServerRunningAddr);

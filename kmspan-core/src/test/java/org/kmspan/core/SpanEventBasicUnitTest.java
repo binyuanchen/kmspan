@@ -2,8 +2,8 @@ package org.kmspan.core;
 
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
-import org.kmspan.core.precise.SamplePreciseEventModeConsumerApp;
-import org.kmspan.core.rough.SampleRoughEventModeConsumerApp;
+import org.kmspan.core.precise.SampleRTModeConsumerApp;
+import org.kmspan.core.rough.SampleNRTModeConsumerApp;
 import org.kmspan.testutils.BaseTestUtil;
 import org.kmspan.testutils.LocalKafkaBroker;
 import org.kmspan.testutils.LocalZookeeperServer;
@@ -67,13 +67,13 @@ public class SpanEventBasicUnitTest {
 
         // create a consumer that polls messages and consume them in a way so that span events
         // are processed in 'rough mode', and spy on it
-        SampleRoughEventModeConsumerApp consumerApp = new SampleRoughEventModeConsumerApp(
+        SampleNRTModeConsumerApp consumerApp = new SampleNRTModeConsumerApp(
                 zkServer.getRunningAddr(),
                 kafkaBroker.getRunningAddr(),
                 numOfPartitions,
                 topicName,
                 listenerSpy);
-        SampleRoughEventModeConsumerApp consumerAppSpy = spy(consumerApp);
+        SampleNRTModeConsumerApp consumerAppSpy = spy(consumerApp);
 
         // create a producer to send span messages and user messages
         SampleSpanProducerApp producerApp = new SampleSpanProducerApp(kafkaBroker.getRunningAddr());
@@ -121,13 +121,13 @@ public class SpanEventBasicUnitTest {
 
         // create a consumer that polls messages and consume them in a way so that span events are
         // processed in 'precise mode', and spy on it
-        SamplePreciseEventModeConsumerApp consumerApp = new SamplePreciseEventModeConsumerApp(
+        SampleRTModeConsumerApp consumerApp = new SampleRTModeConsumerApp(
                 zkServer.getRunningAddr(),
                 kafkaBroker.getRunningAddr(),
                 numOfPartitions,
                 topicName,
                 listenerSpy);
-        SamplePreciseEventModeConsumerApp consumerAppSpy = spy(consumerApp);
+        SampleRTModeConsumerApp consumerAppSpy = spy(consumerApp);
 
         // create a producer to send span messages and user messages
         SampleSpanProducerApp producerApp = new SampleSpanProducerApp(kafkaBroker.getRunningAddr());

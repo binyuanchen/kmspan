@@ -27,7 +27,7 @@ public class SampleSpanProducerApp {
         props.put("linger.ms", 1);
         props.put("buffer.memory", 33554432);
         // property "key.serializer" is disabled by SpanKafkaConsumer, currently, the key
-        // is serialized using the SpanDataSerDeser
+        // is serialized using the BaseSpanKeySerializer
         props.put("value.serializer", "org.apache.kafka.common.serialization.StringSerializer");
 
         this.spanKafkaProducer = new SpanKafkaProducer<>(props, null);
