@@ -9,23 +9,34 @@ import org.kmspan.core.SpanKey;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
 
 /**
- * The actual messages on the wire (say Kafka) contains
+ * The base serializer and de-serializer template of {@link SpanKey span key} who carries user message key of
+ * type {@link T}. For example of using this template, see tests of this class.
  */
 public class SpanDataSerDeser<T> implements Deserializer<SpanKey<T>>, Serializer<SpanKey<T>> {
 
-    // TODO make it thread safe
-    private Kryo kryo;
+    private final static List<Class> clazzes = new ArrayList<>();
 
-    public void kryoRegister(Class clazz) {
-        kryo.register(clazz);
-    }
+    private static final ThreadLocal<Kryo> kryos = new ThreadLocal<Kryo>() {
+        protected Kryo initialValue() {
+            Kryo kryo = new Kryo();
+            for (Class c : clazzes) {
+                kryo.register(c);
+            }
+            return kryo;
+        }
+    };
 
     public SpanDataSerDeser() {
-        kryo = new Kryo();
-        kryo.register(SpanKey.class);
+        clazzes.add(SpanKey.class);
+    }
+
+    public void kryoRegister(Class clazz) {
+        clazzes.add(clazz);
     }
 
     @Override
@@ -35,18 +46,17 @@ public class SpanDataSerDeser<T> implements Deserializer<SpanKey<T>>, Serializer
 
     @Override
     public SpanKey<T> deserialize(String topic, byte[] data) {
-        return kryo.readObject(new Input(data), SpanKey.class);
+        return kryos.get().readObject(new Input(data), SpanKey.class);
     }
 
     @Override
     public byte[] serialize(String topic, SpanKey<T> data) {
         try (ByteArrayOutputStream baos = new ByteArrayOutputStream()) {
             Output output = new Output(baos);
-            kryo.writeObject(output, data);
+            kryos.get().writeObject(output, data);
             output.flush();
             return baos.toByteArray();
-        }
-        catch (IOException e) {
+        } catch (IOException e) {
             return null;
         }
     }
