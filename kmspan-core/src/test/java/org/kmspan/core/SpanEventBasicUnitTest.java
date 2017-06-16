@@ -2,8 +2,8 @@ package org.kmspan.core;
 
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
-import org.kmspan.core.rt.SampleRTModeConsumerApp;
 import org.kmspan.core.nrt.SampleNRTModeConsumerApp;
+import org.kmspan.core.rt.SampleRTModeConsumerApp;
 import org.kmspan.testutils.BaseTestUtil;
 import org.kmspan.testutils.LocalKafkaBroker;
 import org.kmspan.testutils.LocalZookeeperServer;
@@ -46,7 +46,7 @@ public class SpanEventBasicUnitTest {
     }
 
     @Test
-    public void testBasicSpanRoughEventMode() {
+    public void testBasicSpanNRTMode() {
         // randomly generate a topic name, for this test
         final String topicName = BaseTestUtil.generateRandomTopicName();
         // the number of partitioned to be configured for the topic
@@ -101,7 +101,7 @@ public class SpanEventBasicUnitTest {
     }
 
     @Test
-    public void testBasicSpanPreciseEventMode() {
+    public void testBasicSpanRTMode() {
         // randomly generate a topic name, for this test
         final String topicName = BaseTestUtil.generateRandomTopicName();
         // the number of partitioned to be configured for the topic

@@ -32,11 +32,9 @@ import java.util.regex.Pattern;
  * For {@link SpanProcessingStrategy.Mode#RT RT mode}, please see {@link #pollWithSpan(long) pollWithSpan} method and
  * {@link OrderedMixedIterable iterable}.
  * <p>
- * For more details on both, please see more details on kmspan wiki
- * <a href="https://github.com/binyuanchen/kmspan/wiki">kmspan wiki</a>.
  *
- * @param <K> Type of the key of the user messages
- * @param <V> Type of tge value of the user messages
+ * @param <K> user message key type
+ * @param <V> user message value type
  */
 public class SpanKafkaConsumer<K, V> implements Consumer<K, V> {
     private static Logger logger = LogManager.getLogger(SpanKafkaConsumer.class);
@@ -48,7 +46,7 @@ public class SpanKafkaConsumer<K, V> implements Consumer<K, V> {
     private String spanEndSCZPath;
     private SpanProcessingStrategy.Mode processingMode = SpanProcessingStrategy.Mode.NRT;
 
-    private KafkaZookeeperSpanMessageHandler kafkaZKSpanEventHandler;
+    private KafkaZookeeperSpanMessageHandler kafkaZKSpanMessageHandler;
 
     public SpanKafkaConsumer(Map<String, Object> configs, BaseSpanKeySerializer<K> deser) {
         this(configs, deser, null);
@@ -86,7 +84,7 @@ public class SpanKafkaConsumer<K, V> implements Consumer<K, V> {
             deser = new BaseSpanKeySerializer<>();
         }
         rawKafkaConsumer = new KafkaConsumer<>(configs, deser, valueDeserializer);
-        kafkaZKSpanEventHandler = new KafkaZookeeperSpanMessageHandler(
+        kafkaZKSpanMessageHandler = new KafkaZookeeperSpanMessageHandler(
                 curatorFramework,
                 rawKafkaConsumer,
                 spanBeginSCZPath,
@@ -141,7 +139,7 @@ public class SpanKafkaConsumer<K, V> implements Consumer<K, V> {
             deser = new BaseSpanKeySerializer<>();
         }
         rawKafkaConsumer = new KafkaConsumer<>(properties, deser, valueDeserializer);
-        kafkaZKSpanEventHandler = new KafkaZookeeperSpanMessageHandler(
+        kafkaZKSpanMessageHandler = new KafkaZookeeperSpanMessageHandler(
                 curatorFramework,
                 rawKafkaConsumer,
                 spanBeginSCZPath,
@@ -157,6 +155,7 @@ public class SpanKafkaConsumer<K, V> implements Consumer<K, V> {
                 processingMode = pmode;
             }
         } else {
+            // default mode is NRT
             processingMode = SpanProcessingStrategy.Mode.NRT;
         }
     }
@@ -166,7 +165,7 @@ public class SpanKafkaConsumer<K, V> implements Consumer<K, V> {
     }
 
     public void registerSpanEventListener(SpanEventListener listener) {
-        this.kafkaZKSpanEventHandler.registerSpanEventListener(listener);
+        this.kafkaZKSpanMessageHandler.registerSpanEventListener(listener);
     }
 
     @Override
@@ -204,29 +203,56 @@ public class SpanKafkaConsumer<K, V> implements Consumer<K, V> {
         rawKafkaConsumer.unsubscribe();
     }
 
+    /**
+     * The assumption here is: the current thread (maybe created by the kafka client), a.k.a. the poller thread, is
+     * the same thread later that will push (in some framework such as Apache Camel), or return (when client coode
+     * directly calls this method then do some processing on the returned messages) the user messages to user code,
+     * which will reuse the same thread to process these messages.
+     * <p>
+     * This api is disabled when kmspan is running in {@link SpanProcessingStrategy.Mode#RT}, the reason is: this method
+     * does not process received span messages, it simply does two things (mostly),
+     * <p>
+     * 1. sort out span messages and put them into thread local,
+     * 2. sort out user messages and return them to user code.
+     * <p>
+     * Because of 1, it is crucial that the user code which receives the returned user messages also passes these messages
+     * to a {@link org.kmspan.core.annotation.Spaned annotated} method for further processing.
+     *
+     * @param timeout timeout waiting for poll result
+     * @return
+     */
     @Override
     public ConsumerRecords<K, V> poll(long timeout) {
-        // if you try to get span messages processed in rt mode, you should not
-        // use this api
         if (processingMode.equals(SpanProcessingStrategy.Mode.RT)) {
             throw new IllegalStateException("poll is not supported in span processing mode "
                     + processingMode.getName());
         }
         /**
-         * assuming the same caller thread is gonna do the real work synchronously
          * TODO switch mode (if enabled, use annotation, else, process span event right here)
+         *
+         * TODO Probably does not make sense to register this handler here each time polling, but since the cost is relatively
+         * low to do that, I just leave this code here for later to refactor.
          */
-        SpanEventTLHolder.setSpanEventHandler(kafkaZKSpanEventHandler);
-        // TODO revisit this logic here: should we clear?
-        List<SpanMessage> remaining = SpanEventTLHolder.getSpanEvents();
+        SpanMessageTLHolder.setSpanMessageHandler(kafkaZKSpanMessageHandler);
+
+        /**
+         * This is definitely needed as we do not know the current thread is coming from a thread pool or not. If always
+         * a new thread is created to poll, thread local will be initialized, but if the current thread is coming from a
+         * thread pool, the previous thread local are not 'automatically' cleaned, so we need to clean up it here.
+         *
+         * Why not letting the code who consumes the thread locals clean up after using? Because there is not single place
+         * in the code (or single methods) knows the timing to clean up. See the
+         * {@link org.kmspan.core.annotation.SpanedAspect annotation processor}
+         */
+        List<SpanMessage> remaining = SpanMessageTLHolder.getSpanMessages();
         if (remaining != null && !remaining.isEmpty()) {
-            logger.warn("will clear remaining span events = {}", remaining.size());
+            logger.warn("will clear remaining span messages = {}", remaining.size());
             remaining.clear();
         }
 
         ConsumerRecords<SpanKey<K>, V> wireRecords = rawKafkaConsumer.poll(timeout);
 
-        // span messages with some ordering
+        // span messages with 'some' ordering, please see comparator definition about what 'some' ordering means
         TreeSet<SpanMessage> newSpanMessages = new TreeSet<>(new SpanMessageComparator());
 
         // user messages
@@ -245,10 +271,18 @@ public class SpanKafkaConsumer<K, V> implements Consumer<K, V> {
             });
         }
 
-        SpanEventTLHolder.getSpanEvents().addAll(newSpanMessages);
+        SpanMessageTLHolder.getSpanMessages().addAll(newSpanMessages);
         return new ConsumerRecords<>(newUserRecords);
     }
 
+    /**
+     * This method is disabled when kmpsan is running in {@link SpanProcessingStrategy.Mode#NRT}. The reason is: this
+     * method polls raw kafka messages and returns an iterator with the mix of span messages and user messages sorted
+     * properly.
+     *
+     * @param timeout timeout waiting for poll response
+     * @return
+     */
     public Iterator<ConsumerRecord<K, V>> pollWithSpan(long timeout) {
         if (processingMode.equals(SpanProcessingStrategy.Mode.NRT)) {
             throw new IllegalStateException("pollWithSpan is not supported in span processing mode "
@@ -258,11 +292,14 @@ public class SpanKafkaConsumer<K, V> implements Consumer<K, V> {
         ConsumerRecords<SpanKey<K>, V> wireRecords = rawKafkaConsumer.poll(timeout);
 
         return hasAnySpanMessages(wireRecords) ?
-                new OrderedMixedIterable<>(kafkaZKSpanEventHandler, wireRecords).iterator() :
+                new OrderedMixedIterable<>(kafkaZKSpanMessageHandler, wireRecords).iterator() :
                 new UserOnlyIterable(wireRecords.iterator()).iterator();
     }
 
-    // decides whether a poll of records contains any span messages
+    /**
+     * @param records the list of messages to inspect
+     * @return true if at least one message is a span message
+     */
     private boolean hasAnySpanMessages(ConsumerRecords<SpanKey<K>, V> records) {
         return records.partitions().parallelStream().flatMap(tp -> records.records(tp).parallelStream())
                 .anyMatch(cr -> cr.key().getType() != null);

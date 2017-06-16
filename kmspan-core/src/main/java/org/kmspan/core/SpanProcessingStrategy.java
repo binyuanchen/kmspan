@@ -4,11 +4,21 @@ package org.kmspan.core;
 public class SpanProcessingStrategy {
 
     /**
-     * In one JVM, only one of The {@link #NRT NRT} mode and {@link #RT RT} mode are mutual exclusive can be chosen.
+     * In a single jvm, kmspan framework can only run as one of The {@link #NRT NRT} and {@link #RT RT} modes.
+     * <p>
+     * When running in NRT mode:
+     * 1. {@link SpanKafkaConsumer#pollWithSpan(long) pollWithSpan} api can not be used,
+     * 2. {@link SpanKafkaConsumer#poll(long) poll} api can be used by user code, this method returns
+     * {@link org.apache.kafka.clients.consumer.ConsumerRecords ConsumerRecords}, use code must also supply this result
+     * to a user defined method that is annotated with {@link org.kmspan.core.annotation.Spaned Spaned} annotation,
+     * 3. internally, the {@link SpanKafkaConsumer#poll(long) poll} api still uses the raw
+     * {@link org.apache.kafka.clients.consumer.KafkaConsumer#poll(long) raw poll} api to poll raw kafka messages off
+     * the kafka brokers. For a batch of raw kafka messages, it may contain only user messages or a mix of user messages
+     * and span messages.
      */
     public enum Mode {
         /**
-         * Rough mode means:
+         * NRT mode means:
          * <p>
          * 1. user can not use the {@link SpanKafkaConsumer#pollWithSpan(long) pollWithSpan} api.
          * 2. user use the {@link SpanKafkaConsumer#poll(long) poll} api, and get back
@@ -18,7 +28,7 @@ public class SpanProcessingStrategy {
          * used to poll messages off the Kafka broker, which may contain only user messages or a mix of span messages
          * and user messages. For these messages, in nrt mode:
          * <p>
-         * 3.1 user messages are not sorted by {@link SpanKey#generationTimestamp generation timestamp},
+         * 3.1 user messages are not sorted by {@link SpanKey# generation timestamp},
          * <p>
          * 3.2 the span BEGIN messages are sorted by {@link SpanKey#generationTimestamp generation timestamp}, and are
          * processed before the execution of the {@link org.kmspan.core.annotation.Spaned Spaned} annotated method,
@@ -30,7 +40,7 @@ public class SpanProcessingStrategy {
         NRT("nrt")
 
         /**
-         * rt mode means:
+         * RT mode means:
          * <p>
          * 1. user uses the {@link SpanKafkaConsumer#pollWithSpan(long) pollWithSpan} api, and get back a
          * {@link org.kmspan.core.SpanKafkaConsumer.SpanIterable OrderedMixedIterable}, then user follows the regular way
