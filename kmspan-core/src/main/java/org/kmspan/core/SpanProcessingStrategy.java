@@ -6,6 +6,9 @@ public class SpanProcessingStrategy {
     /**
      * In a single jvm, kmspan framework can only run as one of The {@link #NRT NRT} and {@link #RT RT} modes.
      * <p>
+     * The default mode is the NRT mode.
+     * <p>
+     * <p>
      * When running in NRT mode:
      * 1. {@link SpanKafkaConsumer#pollWithSpan(long) pollWithSpan} api can not be used,
      * 2. {@link SpanKafkaConsumer#poll(long) poll} api can be used by user code, this method returns
@@ -14,43 +17,28 @@ public class SpanProcessingStrategy {
      * 3. internally, the {@link SpanKafkaConsumer#poll(long) poll} api still uses the raw
      * {@link org.apache.kafka.clients.consumer.KafkaConsumer#poll(long) raw poll} api to poll raw kafka messages off
      * the kafka brokers. For a batch of raw kafka messages, it may contain only user messages or a mix of user messages
-     * and span messages.
+     * and span messages. The user messages are not sorted by {@link SpanMessage#getKafkaTimestamp()}. The
+     * {@link SpanConstants#SPAN_BEGIN span begin} messages are sorted by {@link SpanMessage#getKafkaTimestamp()}, and
+     * are processed (in the same thread) before the execution of the {@link org.kmspan.core.annotation.Spaned Spaned}
+     * annotated method. Similarly, {@link SpanConstants#SPAN_END span end} messages are sorted by
+     * {@link SpanMessage#getKafkaTimestamp()}, and are processed (in the same thread) after the execution of the
+     * {@link org.kmspan.core.annotation.Spaned Spaned} annotated method.
+     * <p>
+     * When running in RT mode:
+     * <p>
+     * 1. {@link SpanKafkaConsumer#poll(long) poll} api can not be used,
+     * 2. {@link SpanKafkaConsumer#pollWithSpan(long) pollWithSpan} api can be used by user code, this method returns an
+     * iterator that enforces user code to walk through the user messages in the order that kmspan wants. Please see
+     * {@link SpanProcessingStrategy.Mode#RT rt mode} for more.
      */
     public enum Mode {
         /**
-         * NRT mode means:
-         * <p>
-         * 1. user can not use the {@link SpanKafkaConsumer#pollWithSpan(long) pollWithSpan} api.
-         * 2. user use the {@link SpanKafkaConsumer#poll(long) poll} api, and get back
-         * {@link org.apache.kafka.clients.consumer.ConsumerRecords ConsumerRecords}, but user also must
-         * pass the ConsumerRecords to a method annotated with {@link org.kmspan.core.annotation.Spaned Spaned}.
-         * 3. internally, the {@link org.apache.kafka.clients.consumer.KafkaConsumer#poll(long) raw poll} api is
-         * used to poll messages off the Kafka broker, which may contain only user messages or a mix of span messages
-         * and user messages. For these messages, in nrt mode:
-         * <p>
-         * 3.1 user messages are not sorted by {@link SpanKey# generation timestamp},
-         * <p>
-         * 3.2 the span BEGIN messages are sorted by {@link SpanKey#generationTimestamp generation timestamp}, and are
-         * processed before the execution of the {@link org.kmspan.core.annotation.Spaned Spaned} annotated method,
-         * the span END message are sorted also {@link SpanKey#generationTimestamp generation timestamp}, and are
-         * processed after the execution of the {@link org.kmspan.core.annotation.Spaned Spaned} annotated method.
-         * <p>
-         * This is the default mode.
+         * the NEAR REAL TIME mode
          */
         NRT("nrt")
 
         /**
-         * RT mode means:
-         * <p>
-         * 1. user uses the {@link SpanKafkaConsumer#pollWithSpan(long) pollWithSpan} api, and get back a
-         * {@link org.kmspan.core.SpanKafkaConsumer.SpanIterable OrderedMixedIterable}, then user follows the regular way
-         * of iterating over this OrderedMixedIterable.
-         * 2. user can not use {@link SpanKafkaConsumer#poll(long) poll} api.
-         * 3. internally, the {@link org.apache.kafka.clients.consumer.KafkaConsumer#poll(long) raw poll} api is
-         * used to poll messages off the Kafka broker, which may contain only user messages or a mix of span messages
-         * and user messages. For these messages, in rt mode: span messages (if any) and user messages (if any)
-         * will be sorted together by {@link SpanKey#generationTimestamp generation timestamp}, the order is then
-         * honored by the resulting {@link org.kmspan.core.SpanKafkaConsumer.SpanIterable OrderedMixedIterable}.
+         * the REAL TIME mode
          */
         , RT("rt");
 
@@ -104,7 +92,7 @@ public class SpanProcessingStrategy {
     public static enum SpanMessageOrdering {
         /**
          * If {@link org.apache.kafka.clients.consumer.KafkaConsumer#poll(long) poll} returns span messages,
-         * they will be processed in order of {@link SpanKey#generationTimestamp generation time}.
+         * they will be processed in order of {@link SpanMessage#getKafkaTimestamp()}  generation time}.
          */
         ORDERED
 
@@ -123,7 +111,7 @@ public class SpanProcessingStrategy {
     public static enum UserMessageOrdering {
         /**
          * The user messages returned by {@link org.apache.kafka.clients.consumer.KafkaConsumer#poll(long) poll} will
-         * be ordered {@link SpanKey#generationTimestamp generation time} before being further returned to client
+         * be ordered {@link SpanMessage#getKafkaTimestamp()}  generation time} before being further returned to client
          */
         ORDERED
 

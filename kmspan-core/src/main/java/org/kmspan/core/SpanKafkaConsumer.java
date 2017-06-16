@@ -277,8 +277,15 @@ public class SpanKafkaConsumer<K, V> implements Consumer<K, V> {
 
     /**
      * This method is disabled when kmpsan is running in {@link SpanProcessingStrategy.Mode#NRT}. The reason is: this
-     * method polls raw kafka messages and returns an iterator with the mix of span messages and user messages sorted
-     * properly.
+     * method polls raw kafka messages and internally check if there are span messages found, then,
+     * <p>
+     * 1. if there are not span messages found, it will just return an iterator of user messages without any further
+     * ordering the messages (the original iterator from kafka is reused and returned),
+     * <p>
+     * 2. if there are span messages found, it will compose a total ordered (see {@link OrderedMixedIterable iterator}
+     * iterator of the mixed users messages and span messages to client code. When client code walks through this
+     * iterator, span messages will be 'silently' processed behind the scene, while client code only sees the user
+     * messages.
      *
      * @param timeout timeout waiting for poll response
      * @return
@@ -438,7 +445,12 @@ public class SpanKafkaConsumer<K, V> implements Consumer<K, V> {
         }
     }
 
-    // best-effort comparator for ordering mixed set of user and span messages
+    /**
+     * best-effort comparator for totally ordering mixed set of user and span messages
+     *
+     * @param <K>
+     * @param <V>
+     */
     private static class MixedMessageComparator<K, V> implements Comparator<ConsumerRecord<SpanKey<K>, V>> {
         // overall, should no return 0, as that will cause lose of events/messages
         @Override
@@ -473,6 +485,13 @@ public class SpanKafkaConsumer<K, V> implements Consumer<K, V> {
         }
     }
 
+    /**
+     * This iterator assumes the messages are only user messages, no span messages are included. It returns user messages
+     * by stripping off raw messages, in the same order as the raw kafka iterator.
+     *
+     * @param <K>
+     * @param <V>
+     */
     private class UserOnlyIterable<K, V> implements Iterable<ConsumerRecord<K, V>> {
         private final Iterator<ConsumerRecord<SpanKey<K>, V>> it;
 
