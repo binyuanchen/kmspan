@@ -36,7 +36,9 @@ public class BaseSpanKeySerializer<T> implements Deserializer<SpanKey<T>>, Seria
     };
 
     public BaseSpanKeySerializer() {
-        clazzes.putIfAbsent(SpanKey.class, Boolean.TRUE);
+        synchronized (clazzes) {
+            clazzes.putIfAbsent(SpanKey.class, Boolean.TRUE);
+        }
     }
 
     public void kryoRegisters(List<Class> clazzList) {
