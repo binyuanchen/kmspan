@@ -12,6 +12,8 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
 
 /**
  * The base serializer and de-serializer template of {@link SpanKey span key} who carries user message key of
@@ -19,24 +21,30 @@ import java.util.Map;
  */
 public class BaseSpanKeySerializer<T> implements Deserializer<SpanKey<T>>, Serializer<SpanKey<T>> {
 
-    private final static List<Class> clazzes = new ArrayList<>();
+    private final static ConcurrentMap<Class, Boolean> clazzes = new ConcurrentHashMap<>();
 
     private static final ThreadLocal<Kryo> kryos = new ThreadLocal<Kryo>() {
         protected Kryo initialValue() {
             Kryo kryo = new Kryo();
-            for (Class c : clazzes) {
-                kryo.register(c);
+            synchronized (clazzes) {
+                for (Class c : clazzes.keySet()) {
+                    kryo.register(c);
+                }
             }
             return kryo;
         }
     };
 
     public BaseSpanKeySerializer() {
-        clazzes.add(SpanKey.class);
+        clazzes.putIfAbsent(SpanKey.class, Boolean.TRUE);
     }
 
-    public void kryoRegister(Class clazz) {
-        clazzes.add(clazz);
+    public void kryoRegisters(List<Class> clazzList) {
+        synchronized (clazzes) {
+            clazzList.forEach(clazz -> {
+                clazzes.putIfAbsent(clazz, Boolean.TRUE);
+            });
+        }
     }
 
     @Override

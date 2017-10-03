@@ -124,17 +124,13 @@ public class SpanKeySerializationGeneralTest {
         SpanKey<UserKey> spanKey = new SpanKey<>("d", "e", userKey1);
 
         BaseSpanKeySerializer<UserKey> ser = new BaseSpanKeySerializer<>();
-        ser.kryoRegister(UserKey.class);
-        ser.kryoRegister(UserKeyMetaValue.class);
-        ser.kryoRegister(HashMap.class);
+        ser.kryoRegisters(Arrays.asList(UserKey.class, UserKeyMetaValue.class, HashMap.class));
 
         byte[] persisted = null;
         persisted = ser.serialize("x", spanKey);
 
         BaseSpanKeySerializer<UserKey> deser = new BaseSpanKeySerializer<>();
-        deser.kryoRegister(UserKey.class);
-        deser.kryoRegister(UserKeyMetaValue.class);
-        deser.kryoRegister(HashMap.class);
+        deser.kryoRegisters(Arrays.asList(UserKey.class, UserKeyMetaValue.class, HashMap.class));
 
         SpanKey<UserKey> result = deser.deserialize("y", persisted);
 
